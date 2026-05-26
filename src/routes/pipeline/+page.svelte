@@ -23,6 +23,7 @@
 	let launchUseLlm = $state(false);
 	let launchForce = $state(false);
 	let launchLlmBudget = $state('');
+	let launchLlmProvider = $state('claude');
 	let launchStatus = $state('');
 	let launchError = $state('');
 	let launchLoading = $state(false);
@@ -34,7 +35,7 @@
 		{ id: 'db-profile',    label: 'DB Profile',    desc: 'Profile directly to PostgreSQL',       detail: 'Same as profile, but writes publications, co-author edges, and observed name signatures directly to PostgreSQL tables. Requires a prior migrate run (schema must exist).' },
 		{ id: 'migrate',       label: 'Migrate',       desc: 'Load all CSVs into the database',       detail: 'Loads all CSV files into PostgreSQL using upserts: authors, metrics snapshots, observed signatures, publications with authorships, and coauthor edges. Also recalculates edges from resolved authorships and backfills author positions. Safe to re-run.' },
 		{ id: 'enrich',        label: 'Enrich',        desc: 'Query OpenAlex for DOIs & metadata',   detail: 'Enriches publications by querying the OpenAlex API. Fetches DOIs, abstracts, document types, venue normalization, and external citation counts. Resumable — skips already-enriched publications. Rate-limited to respect API limits.' },
-		{ id: 'disambiguate',  label: 'Disambiguate',  desc: 'AND pipeline: cluster & resolve',      detail: 'Author Name Disambiguation pipeline. Phase 1: namespace clustering via co-author overlap and year range. Phase 2: institutional filter using UdeC directory. Phase 3: BGE-M3 semantic embedding resolver. Optional Phase 4: Claude Sonnet 4.6 LLM fallback for persistent ambiguous signatures (enable "Use LLM" below).' },
+		{ id: 'disambiguate',  label: 'Disambiguate',  desc: 'AND pipeline: cluster & resolve',      detail: 'Author Name Disambiguation pipeline. Phase 1: namespace clustering via co-author overlap and year range. Phase 2: institutional filter using UdeC directory. Phase 3: BGE-M3 semantic embedding resolver. Optional Phase 4: LLM fallback for persistent ambiguous signatures (enable "Use LLM" below; select Claude or local model).' },
 		{ id: 'indicators',    label: 'Indicators',    desc: 'Compute h-index, PageRank & report',   detail: 'Computes bibliometric and network indicators per author: total publications, total citations, h-index, i10-index, PageRank, betweenness centrality, and clustering coefficient. Writes docs/indicators_report.md and appends a new snapshot for longitudinal analysis.' },
 		{ id: 'evaluate',      label: 'Evaluate',      desc: 'Build gold standard & score AND',      detail: 'Formal evaluation (Phase 6). Builds a gold standard from profile-owner publications, then computes B-Cubed F1, K-metric, and Macro F1 for both the AND system and a name-only baseline. Separates results into easy and hard (ambiguous) entries. Writes docs/evaluation_report.md.' },
 	];
@@ -96,6 +97,7 @@
 				build_only: launchBuildOnly,
 				gold_path: launchGoldPath,
 				use_llm: launchUseLlm,
+				llm_provider: launchUseLlm ? launchLlmProvider : undefined,
 				force: launchForce,
 				max_llm_budget_usd: launchLlmBudget ? parseFloat(launchLlmBudget) : null
 			});
@@ -560,16 +562,25 @@
 					<div class="mt-4 pt-4 border-t border-gray-100 space-y-3">
 						<div class="flex items-center gap-2">
 							<input type="checkbox" id="useLlm" bind:checked={launchUseLlm} class="rounded focus:ring-1 focus:ring-indigo-500" />
-							<label for="useLlm" class="text-sm font-medium text-gray-700">Use LLM fallback (Claude Sonnet 4.6)</label>
+							<label for="useLlm" class="text-sm font-medium text-gray-700">Use LLM fallback</label>
 						</div>
 
 						{#if launchUseLlm}
 							<div class="ml-6 space-y-3">
 								<div>
-									<label for="llmBudget" class="block text-xs font-medium text-gray-700 mb-1">Max budget (USD, optional)</label>
-									<input id="llmBudget" type="number" step="0.01" min="0" bind:value={launchLlmBudget} placeholder="No limit" class="w-48 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
-									<p class="mt-0.5 text-[10px] text-gray-400">If the estimated cost exceeds this, Claude is skipped entirely — no API calls are made. Leave empty for no limit.</p>
+									<label for="llmProvider" class="block text-xs font-medium text-gray-700 mb-1">LLM Provider</label>
+									<select id="llmProvider" bind:value={launchLlmProvider} class="w-56 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900 bg-white">
+										<option value="claude">Claude Sonnet 4 (Anthropic)</option>
+										<option value="ollama">Granite 4.1 8B (local, Ollama)</option>
+									</select>
 								</div>
+								{#if launchLlmProvider === 'claude'}
+									<div>
+										<label for="llmBudget" class="block text-xs font-medium text-gray-700 mb-1">Max budget (USD, optional)</label>
+										<input id="llmBudget" type="number" step="0.01" min="0" bind:value={launchLlmBudget} placeholder="No limit" class="w-48 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
+										<p class="mt-0.5 text-[10px] text-gray-400">If the estimated cost exceeds this, Claude is skipped entirely — no API calls are made. Leave empty for no limit.</p>
+									</div>
+								{/if}
 								{#if launchStage === 'disambiguate'}
 									<div class="flex items-center gap-2">
 										<input type="checkbox" id="force" bind:checked={launchForce} class="rounded focus:ring-1 focus:ring-indigo-500" />

@@ -176,6 +176,7 @@ export interface PipelineRunRequest {
 	build_only?: boolean;
 	gold_path?: string;
 	use_llm?: boolean;
+	llm_provider?: string;
 	force?: boolean;
 	max_llm_budget_usd?: number | null;
 }
