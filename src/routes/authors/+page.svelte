@@ -5,13 +5,14 @@
 	import { listAuthors } from '$lib/api/client';
 	import type { Author } from '$lib/api/types';
 
-	type AuthorSortKey = 'canonical_name' | 'affiliation' | 'email_domain' | 'base_citations' | 'is_active';
+	type AuthorSortKey = 'canonical_name' | 'affiliation' | 'email_domain' | 'base_citations' | 'openalex_citations' | 'is_active';
 
 	const backendField: Record<AuthorSortKey, string> = {
 		canonical_name: 'canonical_name',
 		affiliation: 'affiliation',
 		email_domain: 'email_domain',
 		base_citations: 'base_citations',
+		openalex_citations: 'openalex_citations',
 		is_active: 'base_citations',
 	};
 
@@ -77,11 +78,12 @@
 	}
 
 	const sortableCols: { key: AuthorSortKey; label: string }[] = [
-		{ key: 'canonical_name', label: 'Name' },
-		{ key: 'affiliation',     label: 'Affiliation' },
-		{ key: 'email_domain',    label: 'Email' },
-		{ key: 'base_citations',  label: 'Citations' },
-		{ key: 'is_active',       label: 'Status' },
+		{ key: 'canonical_name',     label: 'Name' },
+		{ key: 'affiliation',        label: 'Affiliation' },
+		{ key: 'email_domain',       label: 'Email' },
+		{ key: 'base_citations',     label: 'Scholar' },
+		{ key: 'openalex_citations', label: 'OpenAlex' },
+		{ key: 'is_active',          label: 'Status' },
 	];
 </script>
 
@@ -157,6 +159,7 @@
 								<td class="px-4 py-3 text-sm text-gray-700">{author.affiliation || '—'}</td>
 								<td class="px-4 py-3 text-sm text-gray-700">{author.email_domain || '—'}</td>
 								<td class="px-4 py-3 text-sm text-gray-700">{author.base_citations}</td>
+								<td class="px-4 py-3 text-sm text-gray-700">{author.openalex_citations ?? '—'}</td>
 								<td class="px-4 py-3">
 									<span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full {author.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}">
 										{author.is_active ? 'Active' : 'Inactive'}

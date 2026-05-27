@@ -39,7 +39,7 @@
 	let selectedNode: NetworkNode | null = $state(null);
 	let searchQuery = $state('');
 
-	type NodeSortKey = 'label' | 'publications' | 'h_index' | 'pagerank';
+	type NodeSortKey = 'label' | 'publications' | 'h_index' | 'pagerank' | 'scholar_citations' | 'openalex_citations';
 	let nodeSortKey = $state<NodeSortKey>('publications');
 	let nodeSortDir = $state<'asc' | 'desc'>('desc');
 
@@ -63,7 +63,9 @@
 			if (nodeSortKey === 'label') cmp = a.label.localeCompare(b.label);
 			else if (nodeSortKey === 'publications') cmp = a.publications - b.publications;
 			else if (nodeSortKey === 'h_index') cmp = a.h_index - b.h_index;
-			else cmp = a.pagerank - b.pagerank;
+			else if (nodeSortKey === 'pagerank') cmp = a.pagerank - b.pagerank;
+			else if (nodeSortKey === 'scholar_citations') cmp = a.scholar_citations - b.scholar_citations;
+			else if (nodeSortKey === 'openalex_citations') cmp = a.openalex_citations - b.openalex_citations;
 			return nodeSortDir === 'asc' ? cmp : -cmp;
 		})
 	);
@@ -342,12 +344,33 @@
 					>&times;</button>
 				{/if}
 				<h2 class="font-semibold text-gray-900 pr-6">{node.label}</h2>
-				<div class="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
-					<span>Publications: <strong>{node.publications}</strong></span>
-					<span>H-Index: <strong>{node.h_index}</strong></span>
-					<span>PageRank: <strong>{node.pagerank.toFixed(6)}</strong></span>
+				<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+					<div class="bg-blue-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-blue-700">{node.scholar_citations.toLocaleString()}</div>
+						<div class="text-xs text-gray-600">Scholar Citations</div>
+					</div>
+					<div class="bg-emerald-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-emerald-700">{node.openalex_citations.toLocaleString()}</div>
+						<div class="text-xs text-gray-600">OpenAlex Citations</div>
+					</div>
+					<div class="bg-indigo-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-indigo-700">{node.publications}</div>
+						<div class="text-xs text-gray-600">Publications</div>
+					</div>
+					<div class="bg-blue-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-blue-700">{node.h_index}</div>
+						<div class="text-xs text-gray-600">H-Index (computed)</div>
+					</div>
+					<div class="bg-emerald-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-emerald-700">{node.openalex_h_index}</div>
+						<div class="text-xs text-gray-600">OpenAlex H-Index</div>
+					</div>
+					<div class="bg-purple-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-purple-700">{node.pagerank.toFixed(6)}</div>
+						<div class="text-xs text-gray-600">PageRank</div>
+					</div>
 				</div>
-				<a href="/authors/{node.id}" class="text-sm text-indigo-600 hover:underline mt-2 inline-block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">View author &rarr;</a>
+				<a href="/authors/{node.id}" class="text-sm text-indigo-600 hover:underline mt-3 inline-block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">View author &rarr;</a>
 			</div>
 		{/if}
 
@@ -360,6 +383,8 @@
 							{#each [
 								{ key: 'label' as NodeSortKey, label: 'Name' },
 								{ key: 'publications' as NodeSortKey, label: 'Publications' },
+								{ key: 'scholar_citations' as NodeSortKey, label: 'Scholar' },
+								{ key: 'openalex_citations' as NodeSortKey, label: 'OpenAlex' },
 								{ key: 'h_index' as NodeSortKey, label: 'H-Index' },
 								{ key: 'pagerank' as NodeSortKey, label: 'PageRank' }
 							] as col}
@@ -386,6 +411,8 @@
 							>
 								<td class="px-4 py-2 text-sm text-indigo-600">{node.label}</td>
 								<td class="px-4 py-2 text-sm text-gray-700">{node.publications}</td>
+								<td class="px-4 py-2 text-sm text-gray-700">{node.scholar_citations.toLocaleString()}</td>
+								<td class="px-4 py-2 text-sm text-gray-700">{node.openalex_citations.toLocaleString()}</td>
 								<td class="px-4 py-2 text-sm text-gray-700">{node.h_index}</td>
 								<td class="px-4 py-2 text-sm text-gray-700">{node.pagerank.toFixed(6)}</td>
 							</tr>

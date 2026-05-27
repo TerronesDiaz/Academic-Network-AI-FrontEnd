@@ -4,6 +4,28 @@ export interface TokenResponse {
 	token_type: string;
 }
 
+export interface ScholarMetrics {
+	citations_all: number;
+	citations_since_2021: number;
+	h_index_all: number;
+	h_index_since_2021: number;
+	i10_index_all: number;
+	i10_index_since_2021: number;
+	publications_count: number;
+	captured_at: string;
+}
+
+export interface OpenAlexMetrics {
+	total_citations: number;
+	publications_count: number;
+	h_index: number;
+	i10_index: number;
+	citations_since_2021: number;
+	publications_since_2021: number;
+	h_index_since_2021: number;
+	i10_index_since_2021: number;
+}
+
 export interface Author {
 	id: number;
 	scholar_user_id: string;
@@ -13,10 +35,13 @@ export interface Author {
 	profile_url: string;
 	image_url: string;
 	base_citations: number;
+	openalex_citations: number | null;
 	is_active: boolean;
 	created_at: string;
 	updated_at: string;
 	latest_indicators?: Record<string, unknown> | null;
+	scholar_metrics?: ScholarMetrics | null;
+	openalex_metrics?: OpenAlexMetrics | null;
 }
 
 export interface PaginatedAuthors {
@@ -37,6 +62,8 @@ export interface PublicationItem {
 	sources: string[];
 	external_metadata: ExternalMetadata[];
 	citations_count: number;
+	openalex_citations: number | null;
+	scholar_citations: number | null;
 	enriched_at: string | null;
 }
 
@@ -99,6 +126,10 @@ export interface NetworkNode {
 	publications: number;
 	h_index: number;
 	pagerank: number;
+	scholar_citations: number;
+	openalex_citations: number;
+	openalex_h_index: number;
+	openalex_i10_index: number;
 }
 
 export interface NetworkEdge {
@@ -132,6 +163,8 @@ export interface IndicatorSummary {
 	authors: number;
 	total_publications: number;
 	total_citations: number;
+	total_citations_scholar: number;
+	total_citations_openalex: number;
 	average_h_index: number;
 	median_h_index: number;
 	top_h_index: IndicatorRow[];
@@ -241,8 +274,33 @@ export interface LLMUsage {
 	run_id: string;
 	model_id: string | null;
 	total_calls: number;
+	success_calls: number;
+	error_calls: number;
 	total_input_tokens: number;
 	total_output_tokens: number;
 	total_cost_usd: number;
 	signatures_evaluated: number;
+	avg_latency_ms: number;
+	p95_latency_ms: number;
+}
+
+export interface LLMUsageByModel {
+	model_id: string;
+	calls: number;
+	input_tokens: number;
+	output_tokens: number;
+	cost_usd: number;
+	signatures_evaluated: number;
+}
+
+export interface LLMSummary {
+	total_calls: number;
+	success_calls: number;
+	error_calls: number;
+	total_input_tokens: number;
+	total_output_tokens: number;
+	total_cost_usd: number;
+	total_signatures_evaluated: number;
+	avg_latency_ms: number;
+	by_model: LLMUsageByModel[];
 }

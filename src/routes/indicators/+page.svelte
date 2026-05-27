@@ -88,23 +88,43 @@
 	const displayColumns = [
 		'author_name',
 		'total_publications',
-		'total_citations',
-		'h_index',
-		'i10_index',
+		'scholar_citations',
+		'openalex_citations',
+		'scholar_h_index',
+		'openalex_h_index',
+		'scholar_i10_index',
+		'openalex_i10_index',
 		'pagerank',
 		'betweenness_centrality',
-		'clustering_coefficient'
+		'clustering_coeff'
 	];
+
+	const columnLabels: Record<string, string> = {
+		author_name: 'Name',
+		total_publications: 'Publications',
+		scholar_citations: 'Scholar Cit.',
+		openalex_citations: 'OpenAlex Cit.',
+		scholar_h_index: 'Scholar H-Idx',
+		openalex_h_index: 'OpenAlex H-Idx',
+		scholar_i10_index: 'Scholar I10',
+		openalex_i10_index: 'OpenAlex I10',
+		pagerank: 'PageRank',
+		betweenness_centrality: 'Betweenness',
+		clustering_coeff: 'Clustering',
+	};
 
 	const columnSortKey: Record<string, IndicatorSortKey | null> = {
 		author_name: 'canonical_name',
 		total_publications: 'total_publications',
-		total_citations: 'total_citations',
-		h_index: 'h_index',
-		i10_index: 'i10_index',
+		scholar_citations: null,
+		openalex_citations: null,
+		scholar_h_index: null,
+		openalex_h_index: null,
+		scholar_i10_index: null,
+		openalex_i10_index: null,
 		pagerank: 'pagerank',
 		betweenness_centrality: 'betweenness_centrality',
-		clustering_coefficient: 'clustering_coeff',
+		clustering_coeff: 'clustering_coeff',
 	};
 </script>
 
@@ -155,9 +175,13 @@
 					<div class="text-2xl font-bold text-indigo-700">{fmtNum(summary.total_publications)}</div>
 					<div class="text-xs text-gray-500">Total Publications</div>
 				</div>
-				<div class="bg-white rounded-lg shadow p-4 text-center">
-					<div class="text-2xl font-bold text-indigo-700">{fmtNum(summary.total_citations)}</div>
-					<div class="text-xs text-gray-500">Total Citations</div>
+				<div class="bg-blue-50 rounded-lg shadow p-4 text-center">
+					<div class="text-2xl font-bold text-blue-700">{fmtNum(summary.total_citations_scholar)}</div>
+					<div class="text-xs text-gray-500">Citas Google Scholar</div>
+				</div>
+				<div class="bg-emerald-50 rounded-lg shadow p-4 text-center">
+					<div class="text-2xl font-bold text-emerald-700">{fmtNum(summary.total_citations_openalex)}</div>
+					<div class="text-xs text-gray-500">Citas OpenAlex</div>
 				</div>
 				<div class="bg-white rounded-lg shadow p-4 text-center">
 					<div class="text-2xl font-bold text-indigo-700">{summary.average_h_index}</div>
@@ -180,7 +204,10 @@
 								<tr>
 									<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
 									{#each displayColumns.filter((c) => c !== 'author_name') as col}
-										<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{col.replace(/_/g, ' ')}</th>
+										{@const sk = columnSortKey[col]}
+										<th class="px-4 py-3 text-left text-xs font-medium uppercase whitespace-nowrap {sk ? 'cursor-pointer select-none hover:bg-gray-100 transition-colors' : 'text-gray-400'} {sk && sortKey === sk ? 'text-indigo-700' : 'text-gray-500'}" scope="col" onclick={() => { if (sk) toggleSort(sk); }}>
+											{columnLabels[col] ?? col.replace(/_/g, ' ')}{sk ? sortIndicator(sk) : ''}
+										</th>
 									{/each}
 								</tr>
 							</thead>
@@ -213,7 +240,7 @@
 									{#each displayColumns as col}
 										{@const sk = columnSortKey[col]}
 										<th class="px-3 py-2 text-left text-xs font-medium uppercase whitespace-nowrap {sk ? 'cursor-pointer select-none hover:bg-gray-100 transition-colors' : 'text-gray-400'} {sk && sortKey === sk ? 'text-indigo-700' : 'text-gray-500'}" scope="col" onclick={() => { if (sk) toggleSort(sk); }} aria-sort={sk && sortKey === sk ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
-											{col.replace(/_/g, ' ')}{sk ? sortIndicator(sk) : ''}
+											{columnLabels[col] ?? col.replace(/_/g, ' ')}{sk ? sortIndicator(sk) : ''}
 										</th>
 									{/each}
 								</tr>

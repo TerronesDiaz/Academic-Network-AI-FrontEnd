@@ -5,7 +5,7 @@
 	import { listPublications } from '$lib/api/client';
 	import type { PublicationItem } from '$lib/api/types';
 
-	type PubSortKey = 'title' | 'publication_year' | 'venue' | 'document_type' | 'citations_count';
+	type PubSortKey = 'title' | 'publication_year' | 'venue' | 'document_type' | 'citations_count' | 'scholar_citations';
 
 	let publications = $state<PublicationItem[]>([]);
 	let total = $state(0);
@@ -77,11 +77,12 @@
 	}
 
 	const sortableCols: { key: PubSortKey; label: string }[] = [
-		{ key: 'title',            label: 'Title' },
-		{ key: 'publication_year', label: 'Year' },
-		{ key: 'venue',            label: 'Venue' },
-		{ key: 'document_type',    label: 'Type' },
-		{ key: 'citations_count',  label: 'Citations' },
+		{ key: 'title',              label: 'Title' },
+		{ key: 'publication_year',   label: 'Year' },
+		{ key: 'venue',              label: 'Venue' },
+		{ key: 'document_type',      label: 'Type' },
+		{ key: 'citations_count',    label: 'OpenAlex' },
+		{ key: 'scholar_citations',  label: 'Scholar' },
 	];
 </script>
 
@@ -162,7 +163,6 @@
 									{col.label}{sortIndicator(col.key)}
 								</th>
 							{/each}
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Sources</th>
 						</tr>
 					</thead>
 					<tbody class="bg-white divide-y divide-gray-100">
@@ -179,12 +179,8 @@
 								<td class="px-4 py-3 text-sm text-gray-600">{pub.publication_year ?? '—'}</td>
 								<td class="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{pub.venue || '—'}</td>
 								<td class="px-4 py-3 text-sm text-gray-600">{pub.document_type || '—'}</td>
-								<td class="px-4 py-3 text-sm text-gray-600">{pub.citations_count}</td>
-								<td class="px-4 py-3 text-sm">
-									{#each pub.sources as src}
-										<span class="inline-block bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded mr-1">{src}</span>
-									{/each}
-								</td>
+								<td class="px-4 py-3 text-sm text-gray-600">{pub.openalex_citations ?? pub.citations_count}</td>
+								<td class="px-4 py-3 text-sm text-gray-600">{pub.scholar_citations ?? '—'}</td>
 							</tr>
 						{/each}
 					</tbody>

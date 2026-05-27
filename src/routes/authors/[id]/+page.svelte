@@ -82,8 +82,7 @@
 		{ key: 'title',            label: 'Title' },
 		{ key: 'publication_year', label: 'Year' },
 		{ key: 'venue',            label: 'Venue' },
-		{ key: 'citations_count',  label: 'Citations' },
-		{ key: 'author_position',  label: 'Position' },
+		{ key: 'citations_count',  label: 'OpenAlex' },
 	];
 
 	function fmtNum(v: unknown) {
@@ -119,8 +118,8 @@
 		</nav>
 
 		<div class="bg-white rounded-lg shadow p-6 mb-6">
-			<div class="flex flex-col sm:flex-row items-start gap-4">
-				<div class="flex-1">
+			<div class="flex flex-col gap-4">
+				<div>
 					<h1 class="text-2xl font-bold text-gray-900">{author.canonical_name}</h1>
 					<p class="text-gray-600 mt-1">{author.affiliation || 'No affiliation'}</p>
 					<p class="text-gray-600 text-sm">
@@ -131,16 +130,73 @@
 						<a href={author.profile_url} target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 hover:underline mt-1 inline-block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded" aria-label="Google Scholar profile (opens in new tab)">Scholar Profile</a>
 					{/if}
 				</div>
-				{#if author.latest_indicators}
-					<div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-center">
-						{#each ['total_publications', 'total_citations', 'h_index'] as key}
-							<div class="bg-indigo-50 rounded-lg p-3 min-w-[80px]">
-								<div class="text-2xl font-bold text-indigo-700">{fmtNum((author!.latest_indicators as Record<string, unknown>)[key])}</div>
-								<div class="text-xs text-gray-500 capitalize">{(key as string).replace(/_/g, ' ')}</div>
+
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+					<div class="bg-blue-50 rounded-lg p-4">
+						<h3 class="text-sm font-semibold text-blue-900 mb-3">Google Scholar</h3>
+						<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+							<div class="text-center">
+								<div class="text-2xl font-bold text-blue-700">{fmtNum(author.base_citations)}</div>
+								<div class="text-xs text-gray-600">Citations</div>
 							</div>
-						{/each}
+							{#if author.scholar_metrics}
+								<div class="text-center">
+									<div class="text-2xl font-bold text-blue-700">{author.scholar_metrics.h_index_all}</div>
+									<div class="text-xs text-gray-600">H-Index</div>
+								</div>
+								<div class="text-center">
+									<div class="text-2xl font-bold text-blue-700">{author.scholar_metrics.i10_index_all}</div>
+									<div class="text-xs text-gray-600">I10-Index</div>
+								</div>
+								<div class="text-center">
+									<div class="text-2xl font-bold text-blue-700">{author.scholar_metrics.publications_count}</div>
+									<div class="text-xs text-gray-600">Publications</div>
+								</div>
+							{/if}
+						</div>
+						{#if author.scholar_metrics}
+							<div class="mt-3 pt-3 border-t border-blue-200 grid grid-cols-2 gap-2 text-xs text-gray-600">
+								<div>Citations (since 2021): <span class="font-semibold">{author.scholar_metrics.citations_since_2021.toLocaleString()}</span></div>
+								<div>H-Index (since 2021): <span class="font-semibold">{author.scholar_metrics.h_index_since_2021}</span></div>
+								<div>I10-Index (since 2021): <span class="font-semibold">{author.scholar_metrics.i10_index_since_2021}</span></div>
+							</div>
+						{/if}
 					</div>
-				{/if}
+
+					<div class="bg-emerald-50 rounded-lg p-4">
+						<h3 class="text-sm font-semibold text-emerald-900 mb-3">OpenAlex</h3>
+						{#if author.openalex_metrics && author.openalex_metrics.publications_count > 0}
+							<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+								<div class="text-center">
+									<div class="text-2xl font-bold text-emerald-700">{fmtNum(author.openalex_metrics.total_citations)}</div>
+									<div class="text-xs text-gray-600">Citations</div>
+								</div>
+								<div class="text-center">
+									<div class="text-2xl font-bold text-emerald-700">{author.openalex_metrics.h_index}</div>
+									<div class="text-xs text-gray-600">H-Index</div>
+								</div>
+								<div class="text-center">
+									<div class="text-2xl font-bold text-emerald-700">{author.openalex_metrics.i10_index}</div>
+									<div class="text-xs text-gray-600">I10-Index</div>
+								</div>
+								<div class="text-center">
+									<div class="text-2xl font-bold text-emerald-700">{author.openalex_metrics.publications_count}</div>
+									<div class="text-xs text-gray-600">Publications</div>
+								</div>
+							</div>
+							<div class="mt-3 pt-3 border-t border-emerald-200 grid grid-cols-2 gap-2 text-xs text-gray-600">
+								<div>Citations (since 2021): <span class="font-semibold">{author.openalex_metrics.citations_since_2021.toLocaleString()}</span></div>
+								<div>H-Index (since 2021): <span class="font-semibold">{author.openalex_metrics.h_index_since_2021}</span></div>
+								<div>I10-Index (since 2021): <span class="font-semibold">{author.openalex_metrics.i10_index_since_2021}</span></div>
+								<div>Publications (since 2021): <span class="font-semibold">{author.openalex_metrics.publications_since_2021}</span></div>
+							</div>
+						{:else}
+							<div class="text-center py-4 text-gray-500 text-sm">
+								No OpenAlex data available
+							</div>
+						{/if}
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -184,6 +240,7 @@
 											{col.label}{sortIndicator(col.key)}
 										</th>
 									{/each}
+									<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scholar</th>
 								</tr>
 							</thead>
 							<tbody class="bg-white divide-y divide-gray-100">
@@ -199,8 +256,8 @@
 										<td class="px-4 py-3 text-sm text-gray-900 max-w-md truncate">{pub.title}</td>
 										<td class="px-4 py-3 text-sm text-gray-600">{pub.publication_year ?? '—'}</td>
 										<td class="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{pub.venue || '—'}</td>
-										<td class="px-4 py-3 text-sm text-gray-600">{pub.citations_count}</td>
-										<td class="px-4 py-3 text-sm text-gray-600">{pub.author_position ?? '—'}</td>
+										<td class="px-4 py-3 text-sm text-gray-600">{pub.openalex_citations ?? pub.citations_count}</td>
+										<td class="px-4 py-3 text-sm text-gray-600">{pub.scholar_citations ?? '—'}</td>
 									</tr>
 								{/each}
 							</tbody>

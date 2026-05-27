@@ -15,7 +15,8 @@ import type {
 	PipelineRunRequest,
 	PaginatedEnrichmentRuns,
 	PaginatedEnrichmentDeferrals,
-	AuthorPublication
+	AuthorPublication,
+	LLMSummary
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -270,4 +271,8 @@ export async function launchPipelineRun(body: PipelineRunRequest) {
 		method: 'POST',
 		body: JSON.stringify(body)
 	});
+}
+
+export async function getLLMSummary(): Promise<LLMSummary> {
+	return request<LLMSummary>('/pipeline/llm-summary');
 }

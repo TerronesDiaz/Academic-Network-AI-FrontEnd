@@ -74,8 +74,12 @@
 					<dd class="text-sm font-medium text-gray-900">{pub.document_type || '—'}</dd>
 				</div>
 				<div>
-					<dt class="text-sm text-gray-500">Citations</dt>
-					<dd class="text-sm font-medium text-gray-900">{pub.citations_count}</dd>
+					<dt class="text-sm text-gray-500">Citas OpenAlex</dt>
+					<dd class="text-sm font-medium text-gray-900">{pub.openalex_citations ?? pub.citations_count}</dd>
+				</div>
+				<div>
+					<dt class="text-sm text-gray-500">Citas Google Scholar</dt>
+					<dd class="text-sm font-medium text-gray-900">{pub.scholar_citations ?? '—'}</dd>
 				</div>
 				<div>
 					<dt class="text-sm text-gray-500">DOI</dt>

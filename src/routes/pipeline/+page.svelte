@@ -2,12 +2,13 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/auth';
-	import { listPipelineRuns, listEnrichmentRuns, launchPipelineRun } from '$lib/api/client';
-	import type { PipelineRun, EnrichmentRunStats, EnrichmentDeferral } from '$lib/api/types';
+	import { listPipelineRuns, listEnrichmentRuns, launchPipelineRun, getLLMSummary } from '$lib/api/client';
+	import type { PipelineRun, EnrichmentRunStats, EnrichmentDeferral, LLMSummary } from '$lib/api/types';
 
 	let runs = $state<PipelineRun[]>([]);
 	let enrichmentRuns = $state<EnrichmentRunStats[]>([]);
 	let deferrals = $state<EnrichmentDeferral[]>([]);
+	let llmSummary = $state<LLMSummary | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 	let activeTab = $state<'runs' | 'enrichment' | 'launch'>('runs');
@@ -65,12 +66,14 @@
 		loading = true;
 		error = '';
 		try {
-			const [runsData, enrichData] = await Promise.all([
+			const [runsData, enrichData, llmData] = await Promise.all([
 				listPipelineRuns({ limit: 50 }),
-				listEnrichmentRuns({ limit: 50 })
+				listEnrichmentRuns({ limit: 50 }),
+				getLLMSummary()
 			]);
 			runs = runsData.items;
 			enrichmentRuns = enrichData.items;
+			llmSummary = llmData;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load pipeline data';
 		} finally {
@@ -268,6 +271,37 @@
 			{/each}
 		</div>
 	{:else if activeTab === 'runs'}
+		{#if llmSummary && llmSummary.total_calls > 0}
+			<div class="bg-white rounded-lg shadow p-4 mb-4">
+				<h3 class="text-sm font-semibold text-gray-700 mb-3">LLM Usage Summary (Cumulative)</h3>
+				<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+					<div class="bg-indigo-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-indigo-700">{llmSummary.total_calls.toLocaleString()}</div>
+						<div class="text-xs text-gray-500">Total Calls</div>
+					</div>
+					<div class="bg-blue-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-blue-700">{(llmSummary.total_input_tokens + llmSummary.total_output_tokens).toLocaleString()}</div>
+						<div class="text-xs text-gray-500">Total Tokens</div>
+					</div>
+					<div class="bg-emerald-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-emerald-700">${llmSummary.total_cost_usd.toFixed(4)}</div>
+						<div class="text-xs text-gray-500">Total Cost (USD)</div>
+					</div>
+					<div class="bg-purple-50 rounded p-2 text-center">
+						<div class="text-lg font-bold text-purple-700">{llmSummary.total_signatures_evaluated.toLocaleString()}</div>
+						<div class="text-xs text-gray-500">Signatures Evaluated</div>
+					</div>
+				</div>
+				{#if llmSummary.by_model.length > 0}
+					<div class="mt-3 text-xs text-gray-500">
+						By model:
+						{#each llmSummary.by_model as model}
+							<span class="inline-block bg-gray-100 px-2 py-0.5 rounded ml-1">{model.model_id}: {model.calls} calls, ${model.cost_usd.toFixed(4)}</span>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
 		<div class="bg-white rounded-lg shadow overflow-hidden" role="tabpanel" aria-label="Pipeline runs">
 			{#if runs.length === 0}
 				<p class="p-12 text-center text-gray-500">No pipeline runs recorded yet</p>
@@ -301,7 +335,7 @@
 								</td>
 								<td class="px-4 py-3 text-xs text-gray-500">
 									{#if run.llm_usage && run.llm_usage.total_calls > 0}
-										<span class="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded" title="{run.llm_usage.total_calls} calls, {run.llm_usage.total_input_tokens}+{run.llm_usage.total_output_tokens} tokens, ${run.llm_usage.total_cost_usd.toFixed(4)}">
+										<span class="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded" title="{run.llm_usage.total_calls} calls ({run.llm_usage.success_calls} ok, {run.llm_usage.error_calls} errors), {run.llm_usage.total_input_tokens.toLocaleString()} in + {run.llm_usage.total_output_tokens.toLocaleString()} out tokens, ${run.llm_usage.total_cost_usd.toFixed(4)}, {run.llm_usage.signatures_evaluated} signatures, avg {run.llm_usage.avg_latency_ms}ms, p95 {run.llm_usage.p95_latency_ms}ms{run.llm_usage.model_id ? ', model: ' + run.llm_usage.model_id : ''}">
 											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
 											{run.llm_usage.total_calls} / ${run.llm_usage.total_cost_usd.toFixed(3)}
 										</span>
