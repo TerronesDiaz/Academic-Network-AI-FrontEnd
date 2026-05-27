@@ -47,7 +47,7 @@
 
 	<div class="min-h-screen bg-gray-50">
 		<nav class="bg-indigo-700 text-white shadow-lg" aria-label="Main navigation">
-			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
 				<div class="flex items-center justify-between h-16">
 					<div class="flex items-center gap-2">
 						<a href="/" class="font-bold text-lg tracking-tight" aria-label="Academic Network home">AcademicNetwork</a>
@@ -90,13 +90,13 @@
 				</div>
 			{/if}
 		</nav>
-		<main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" tabindex="-1">
+		<main id="main-content" class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6" tabindex="-1">
 			{@render children()}
 		</main>
 	</div>
 {:else}
 	<div class="min-h-screen bg-gray-50">
-		<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+		<main class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 			{@render children()}
 		</main>
 	</div>

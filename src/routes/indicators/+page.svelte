@@ -166,30 +166,44 @@
 		</div>
 	{:else}
 		{#if activeTab === 'summary' && summary}
-			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-				<div class="bg-white rounded-lg shadow p-4 text-center">
-					<div class="text-2xl font-bold text-indigo-700">{fmtNum(summary.authors)}</div>
-					<div class="text-xs text-gray-500">Authors</div>
+			<div class="space-y-4 mb-6">
+				<div class="grid grid-cols-2 gap-4">
+					<div class="bg-white rounded-lg shadow p-4 text-center">
+						<div class="text-2xl font-bold text-indigo-700">{fmtNum(summary.authors)}</div>
+						<div class="text-xs text-gray-500">Authors</div>
+					</div>
+					<div class="bg-white rounded-lg shadow p-4 text-center">
+						<div class="text-2xl font-bold text-indigo-700">{fmtNum(summary.total_publications)}</div>
+						<div class="text-xs text-gray-500">Total Publications</div>
+					</div>
 				</div>
-				<div class="bg-white rounded-lg shadow p-4 text-center">
-					<div class="text-2xl font-bold text-indigo-700">{fmtNum(summary.total_publications)}</div>
-					<div class="text-xs text-gray-500">Total Publications</div>
+				<div class="grid grid-cols-3 gap-4">
+					<div class="bg-blue-50 rounded-lg shadow p-4 text-center">
+						<div class="text-2xl font-bold text-blue-700">{fmtNum(summary.total_citations_scholar)}</div>
+						<div class="text-xs text-gray-500">Citas Google Scholar</div>
+					</div>
+					<div class="bg-blue-50 rounded-lg shadow p-4 text-center">
+						<div class="text-2xl font-bold text-blue-700">{summary.average_scholar_h_index}</div>
+						<div class="text-xs text-gray-500">Avg H-Index Scholar</div>
+					</div>
+					<div class="bg-blue-50 rounded-lg shadow p-4 text-center">
+						<div class="text-2xl font-bold text-blue-700">{summary.median_scholar_h_index}</div>
+						<div class="text-xs text-gray-500">Median H-Index Scholar</div>
+					</div>
 				</div>
-				<div class="bg-blue-50 rounded-lg shadow p-4 text-center">
-					<div class="text-2xl font-bold text-blue-700">{fmtNum(summary.total_citations_scholar)}</div>
-					<div class="text-xs text-gray-500">Citas Google Scholar</div>
-				</div>
-				<div class="bg-emerald-50 rounded-lg shadow p-4 text-center">
-					<div class="text-2xl font-bold text-emerald-700">{fmtNum(summary.total_citations_openalex)}</div>
-					<div class="text-xs text-gray-500">Citas OpenAlex</div>
-				</div>
-				<div class="bg-white rounded-lg shadow p-4 text-center">
-					<div class="text-2xl font-bold text-indigo-700">{summary.average_h_index}</div>
-					<div class="text-xs text-gray-500">Avg H-Index</div>
-				</div>
-				<div class="bg-white rounded-lg shadow p-4 text-center">
-					<div class="text-2xl font-bold text-indigo-700">{summary.median_h_index}</div>
-					<div class="text-xs text-gray-500">Median H-Index</div>
+				<div class="grid grid-cols-3 gap-4">
+					<div class="bg-emerald-50 rounded-lg shadow p-4 text-center">
+						<div class="text-2xl font-bold text-emerald-700">{fmtNum(summary.total_citations_openalex)}</div>
+						<div class="text-xs text-gray-500">Citas OpenAlex</div>
+					</div>
+					<div class="bg-emerald-50 rounded-lg shadow p-4 text-center">
+						<div class="text-2xl font-bold text-emerald-700">{summary.average_openalex_h_index}</div>
+						<div class="text-xs text-gray-500">Avg H-Index OpenAlex</div>
+					</div>
+					<div class="bg-emerald-50 rounded-lg shadow p-4 text-center">
+						<div class="text-2xl font-bold text-emerald-700">{summary.median_openalex_h_index}</div>
+						<div class="text-xs text-gray-500">Median H-Index OpenAlex</div>
+					</div>
 				</div>
 			</div>
 

@@ -167,6 +167,10 @@ export interface IndicatorSummary {
 	total_citations_openalex: number;
 	average_h_index: number;
 	median_h_index: number;
+	average_scholar_h_index: number;
+	median_scholar_h_index: number;
+	average_openalex_h_index: number;
+	median_openalex_h_index: number;
 	top_h_index: IndicatorRow[];
 }
 
