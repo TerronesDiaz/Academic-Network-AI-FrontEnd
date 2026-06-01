@@ -11,6 +11,18 @@
 	let loading = $state(true);
 	let error = $state('');
 
+	let backUrl = $state('/publications');
+	let backLabel = $state('Back to Publications');
+
+	$effect(() => {
+		const from = $page.url.searchParams.get('from');
+		const fromLabel = $page.url.searchParams.get('fromLabel');
+		if (from) {
+			backUrl = from;
+			backLabel = fromLabel ? `Back to ${fromLabel}` : 'Back';
+		}
+	});
+
 	$effect(() => {
 		if (browser && !$auth) goto('/login');
 	});
@@ -55,7 +67,7 @@
 		<div role="alert" class="p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>
 	{:else if pub}
 		<nav class="mb-6">
-			<button onclick={() => goto('/publications')} class="text-sm text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">&larr; Back to Publications</button>
+			<button onclick={() => goto(backUrl)} class="text-sm text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">&larr; {backLabel}</button>
 		</nav>
 
 		<article class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="pub-title">
@@ -162,7 +174,8 @@
 								<td class="px-4 py-3 text-sm text-gray-500">{a.author_position ?? i + 1}</td>
 								<th class="px-4 py-3 text-sm font-normal" scope="row">
 									{#if a.author_id}
-										<a href="/authors/{a.author_id}" class="text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">{a.canonical_name || '—'}</a>
+										{@const pubLabel = pub.title.length > 60 ? pub.title.substring(0, 57) + '...' : pub.title}
+										<a href="/authors/{a.author_id}?from=/publications/{pub.id}&fromLabel={encodeURIComponent('Publication: ' + pubLabel)}" class="text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">{a.canonical_name || '—'}</a>
 									{:else}
 										{a.canonical_name || '—'}
 									{/if}

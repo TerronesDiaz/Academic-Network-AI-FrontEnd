@@ -214,6 +214,8 @@ export interface PipelineRunRequest {
 	gold_path?: string;
 	use_llm?: boolean;
 	llm_provider?: string;
+	llm_model?: string | null;
+	llm_workers?: number | null;
 	force?: boolean;
 	max_llm_budget_usd?: number | null;
 }
@@ -307,4 +309,10 @@ export interface LLMSummary {
 	total_signatures_evaluated: number;
 	avg_latency_ms: number;
 	by_model: LLMUsageByModel[];
+}
+
+export interface LLMCatalogResponse {
+	claude: string[];
+	ollama: string[];
+	runpod: string[];
 }

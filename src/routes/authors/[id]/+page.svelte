@@ -20,6 +20,18 @@
 	let pubSortKey = $state<PubSortKey>('publication_year');
 	let pubSortDir = $state<'asc' | 'desc'>('desc');
 
+	let backUrl = $state('/authors');
+	let backLabel = $state('Back to Authors');
+
+	$effect(() => {
+		const from = $page.url.searchParams.get('from');
+		const fromLabel = $page.url.searchParams.get('fromLabel');
+		if (from) {
+			backUrl = from;
+			backLabel = fromLabel ? `Back to ${fromLabel}` : 'Back';
+		}
+	});
+
 	$effect(() => {
 		if (browser && !$auth) goto('/login');
 	});
@@ -114,7 +126,7 @@
 		<div role="alert" class="p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>
 	{:else if author}
 		<nav class="mb-6">
-			<button onclick={() => goto('/authors')} class="text-sm text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">&larr; Back to Authors</button>
+			<button onclick={() => goto(backUrl)} class="text-sm text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">&larr; {backLabel}</button>
 		</nav>
 
 		<div class="bg-white rounded-lg shadow p-6 mb-6">
@@ -249,8 +261,8 @@
 										class="hover:bg-gray-50 cursor-pointer focus-within:bg-gray-50"
 										role="link"
 										tabindex="0"
-										onclick={() => goto(`/publications/${pub.id}`)}
-										onkeydown={(e) => handleRowKeydown(e, `/publications/${pub.id}`)}
+										onclick={() => goto(`/publications/${pub.id}?from=/authors/${authorId}&fromLabel=${encodeURIComponent('Author: ' + author.canonical_name)}`)}
+										onkeydown={(e) => handleRowKeydown(e, `/publications/${pub.id}?from=/authors/${authorId}&fromLabel=${encodeURIComponent('Author: ' + author.canonical_name)}`)}
 										aria-label={`Publication: ${pub.title}`}
 									>
 										<td class="px-4 py-3 text-sm text-gray-900 max-w-md truncate">{pub.title}</td>
@@ -284,8 +296,8 @@
 										class="hover:bg-gray-50 cursor-pointer focus-within:bg-gray-50"
 										role="link"
 										tabindex="0"
-										onclick={() => goto(`/authors/${co.author_id}`)}
-										onkeydown={(e) => handleRowKeydown(e, `/authors/${co.author_id}`)}
+										onclick={() => goto(`/authors/${co.author_id}?from=/authors/${authorId}&fromLabel=${encodeURIComponent('Author: ' + author.canonical_name)}`)}
+										onkeydown={(e) => handleRowKeydown(e, `/authors/${co.author_id}?from=/authors/${authorId}&fromLabel=${encodeURIComponent('Author: ' + author.canonical_name)}`)}
 										aria-label={`Co-author: ${co.canonical_name}`}
 									>
 										<td class="px-4 py-3 text-sm font-medium text-indigo-600">{co.canonical_name}</td>

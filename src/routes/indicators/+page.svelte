@@ -266,7 +266,7 @@
 											{@const val = (row as Record<string, unknown>)[col]}
 											<td class="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
 												{#if col === 'author_name'}
-													<a href="/authors/{(row as Record<string, unknown>).author_id}" class="text-indigo-600 hover:underline">{fmtCell(val)}</a>
+													<a href="/authors/{(row as Record<string, unknown>).author_id}?from=/indicators&fromLabel=Indicators" class="text-indigo-600 hover:underline">{fmtCell(val)}</a>
 												{:else}
 													{fmtCell(val)}
 												{/if}

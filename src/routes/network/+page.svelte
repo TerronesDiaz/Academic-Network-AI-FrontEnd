@@ -228,7 +228,7 @@
 	function handleRowKeydown(e: KeyboardEvent, nodeId: number) {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
-			goto(`/authors/${nodeId}`);
+			goto(`/authors/${nodeId}?from=/network&fromLabel=Network`);
 		}
 	}
 </script>
@@ -370,7 +370,7 @@
 						<div class="text-xs text-gray-600">PageRank</div>
 					</div>
 				</div>
-				<a href="/authors/{node.id}" class="text-sm text-indigo-600 hover:underline mt-3 inline-block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">View author &rarr;</a>
+				<a href="/authors/{node.id}?from=/network&fromLabel=Network" class="text-sm text-indigo-600 hover:underline mt-3 inline-block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">View author &rarr;</a>
 			</div>
 		{/if}
 
@@ -405,7 +405,7 @@
 								class="hover:bg-gray-50 cursor-pointer focus-within:bg-gray-50"
 								role="link"
 								tabindex="0"
-								onclick={() => goto(`/authors/${node.id}`)}
+								onclick={() => goto(`/authors/${node.id}?from=/network&fromLabel=Network`)}
 								onkeydown={(e) => handleRowKeydown(e, node.id)}
 								aria-label={`Author: ${node.label}`}
 							>

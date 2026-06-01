@@ -2,8 +2,8 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/auth';
-	import { listPipelineRuns, listEnrichmentRuns, launchPipelineRun, getLLMSummary } from '$lib/api/client';
-	import type { PipelineRun, EnrichmentRunStats, EnrichmentDeferral, LLMSummary } from '$lib/api/types';
+	import { listPipelineRuns, listEnrichmentRuns, launchPipelineRun, getLLMSummary, getLLMModels } from '$lib/api/client';
+	import type { PipelineRun, EnrichmentRunStats, EnrichmentDeferral, LLMSummary, LLMCatalogResponse } from '$lib/api/types';
 
 	let runs = $state<PipelineRun[]>([]);
 	let enrichmentRuns = $state<EnrichmentRunStats[]>([]);
@@ -25,6 +25,10 @@
 	let launchForce = $state(false);
 	let launchLlmBudget = $state('');
 	let launchLlmProvider = $state('claude');
+	let launchLlmModel = $state('');
+	let launchLlmWorkers = $state('');
+	let llmCatalog = $state<LLMCatalogResponse | null>(null);
+	let llmCatalogLoading = $state(false);
 	let launchStatus = $state('');
 	let launchError = $state('');
 	let launchLoading = $state(false);
@@ -85,6 +89,23 @@
 		if (browser && $auth) fetchData();
 	});
 
+	async function loadLLMCatalog() {
+		if (llmCatalogLoading) return;
+		llmCatalogLoading = true;
+		try {
+			llmCatalog = await getLLMModels();
+		} catch {
+			llmCatalog = { claude: [], ollama: [], runpod: [] };
+		} finally {
+			llmCatalogLoading = false;
+		}
+	}
+
+	function onLlmProviderChange(provider: string) {
+		launchLlmProvider = provider;
+		launchLlmModel = '';
+	}
+
 	async function handleLaunch() {
 		launchLoading = true;
 		launchError = '';
@@ -101,6 +122,8 @@
 				gold_path: launchGoldPath,
 				use_llm: launchUseLlm,
 				llm_provider: launchUseLlm ? launchLlmProvider : undefined,
+				llm_model: launchUseLlm && launchLlmModel ? launchLlmModel : null,
+				llm_workers: launchUseLlm && launchLlmWorkers ? parseInt(launchLlmWorkers) : null,
 				force: launchForce,
 				max_llm_budget_usd: launchLlmBudget ? parseFloat(launchLlmBudget) : null
 			});
@@ -595,19 +618,46 @@
 				{#if launchStage === 'disambiguate' || launchStage === 'from-csvs' || launchStage === 'full'}
 					<div class="mt-4 pt-4 border-t border-gray-100 space-y-3">
 						<div class="flex items-center gap-2">
-							<input type="checkbox" id="useLlm" bind:checked={launchUseLlm} class="rounded focus:ring-1 focus:ring-indigo-500" />
+							<input type="checkbox" id="useLlm" bind:checked={launchUseLlm} class="rounded focus:ring-1 focus:ring-indigo-500" onchange={() => { if (launchUseLlm && !llmCatalog) loadLLMCatalog(); }} />
 							<label for="useLlm" class="text-sm font-medium text-gray-700">Use LLM fallback</label>
+							{#if launchUseLlm && !llmCatalog && !llmCatalogLoading}
+								<button onclick={loadLLMCatalog} class="text-xs text-indigo-600 hover:underline focus:outline-none focus:ring-1 focus:ring-indigo-500 rounded" type="button">Load available models</button>
+							{/if}
+							{#if llmCatalogLoading}
+								<span class="text-xs text-gray-400">Loading models...</span>
+							{/if}
 						</div>
 
 						{#if launchUseLlm}
 							<div class="ml-6 space-y-3">
 								<div>
 									<label for="llmProvider" class="block text-xs font-medium text-gray-700 mb-1">LLM Provider</label>
-									<select id="llmProvider" bind:value={launchLlmProvider} class="w-56 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900 bg-white">
-										<option value="claude">Claude Sonnet 4 (Anthropic)</option>
-										<option value="ollama">Granite 4.1 8B (local, Ollama)</option>
+									<select id="llmProvider" bind:value={launchLlmProvider} onchange={(e) => onLlmProviderChange((e.target as HTMLSelectElement).value)} class="w-56 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900 bg-white">
+										<option value="claude">Claude (Anthropic)</option>
+										<option value="ollama">Ollama (local)</option>
+										<option value="runpod">RunPod (remote Ollama)</option>
 									</select>
 								</div>
+
+								{#if llmCatalog && (llmCatalog[launchLlmProvider as keyof LLMCatalogResponse]?.length || 0) > 0}
+									<div>
+										<label for="llmModel" class="block text-xs font-medium text-gray-700 mb-1">Model</label>
+										<select id="llmModel" bind:value={launchLlmModel} class="w-64 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900 bg-white">
+											<option value="">Default (config)</option>
+											{#each llmCatalog[launchLlmProvider as keyof LLMCatalogResponse] as model}
+												<option value={model}>{model}</option>
+											{/each}
+										</select>
+										<p class="mt-0.5 text-[10px] text-gray-400">Select a specific model, or use "Default" for the server-configured model.</p>
+									</div>
+								{/if}
+
+								<div>
+									<label for="llmWorkers" class="block text-xs font-medium text-gray-700 mb-1">LLM Workers (optional)</label>
+									<input id="llmWorkers" type="number" min="1" max="64" bind:value={launchLlmWorkers} placeholder="Provider default" class="w-32 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
+									<p class="mt-0.5 text-[10px] text-gray-400">Parallel workers for LLM calls. Defaults: Claude=2, Ollama=4, RunPod=20. Reduce for local models to avoid saturation (e.g. Ollama=1).</p>
+								</div>
+
 								{#if launchLlmProvider === 'claude'}
 									<div>
 										<label for="llmBudget" class="block text-xs font-medium text-gray-700 mb-1">Max budget (USD, optional)</label>
