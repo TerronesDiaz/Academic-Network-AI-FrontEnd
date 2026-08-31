@@ -4,6 +4,9 @@
 	import { auth } from '$lib/auth';
 	import { getNetwork, getNetworkStats } from '$lib/api/client';
 	import type { NetworkNode, NetworkEdge, NetworkStats } from '$lib/api/types';
+	import * as m from '$lib/paraglide/messages.js';
+	import { compareLocalized, formatNumber } from '$lib/i18n/format';
+	import { userError } from '$lib/i18n/errors';
 
 	let nodes = $state<NetworkNode[]>([]);
 	let edges = $state<NetworkEdge[]>([]);
@@ -24,7 +27,7 @@
 			edges = netData.edges;
 			stats = statsData;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load network';
+			error = userError(e, m.network_load_error());
 		} finally {
 			loading = false;
 		}
@@ -60,7 +63,7 @@
 	let sortedNodes = $derived(
 		[...nodes].sort((a, b) => {
 			let cmp = 0;
-			if (nodeSortKey === 'label') cmp = a.label.localeCompare(b.label);
+			if (nodeSortKey === 'label') cmp = compareLocalized(a.label, b.label);
 			else if (nodeSortKey === 'publications') cmp = a.publications - b.publications;
 			else if (nodeSortKey === 'h_index') cmp = a.h_index - b.h_index;
 			else if (nodeSortKey === 'pagerank') cmp = a.pagerank - b.pagerank;
@@ -233,27 +236,23 @@
 	}
 </script>
 
-<div>
-	<a href="/" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 mb-3 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">
-		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-		Home
-	</a>
-	<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-		<h1 class="text-2xl font-bold text-gray-900">Co-authorship Network</h1>
-		<div class="flex gap-2">
-			<label for="net-filter" class="sr-only">Filter nodes by name</label>
+<div class="app-page">
+	<header class="page-header">
+		<h1 class="page-heading">{m.network_title()}</h1>
+		<div>
+			<label for="net-filter" class="sr-only">{m.network_filter()}</label>
 			<input
 				id="net-filter"
 				type="search"
-				placeholder="Filter nodes..."
+				placeholder={m.network_filter_placeholder()}
 				bind:value={searchQuery}
-				class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+				class="min-w-56 rounded-md border px-3 py-2 text-sm"
 			/>
 		</div>
-	</div>
+	</header>
 
 	{#if error}
-		<div role="alert" class="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>
+		<div role="alert" class="notice-error">{error}</div>
 	{/if}
 
 	{#if loading}
@@ -268,65 +267,66 @@
 			</div>
 		</div>
 	{:else if stats}
-		<div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
-			<div class="group relative bg-white rounded-lg shadow p-4 text-center cursor-help">
-				<div class="text-2xl font-bold text-indigo-700">{stats.nodes}</div>
-				<div class="text-xs text-gray-500">Nodes</div>
+		<div class="metric-strip lg:grid-cols-5">
+			<div class="metric-cell group relative cursor-help">
+				<div class="metric-label">{m.network_nodes()}</div><div class="metric-value">{stats.nodes}</div>
 				<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
 					<div class="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 w-56 text-center shadow-lg">
-						Total number of researchers (authors) in the co-authorship network. Each node represents one UdeC researcher.
+						{m.network_nodes_help()}
 						<div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
 					</div>
 				</div>
 			</div>
-			<div class="group relative bg-white rounded-lg shadow p-4 text-center cursor-help">
-				<div class="text-2xl font-bold text-indigo-700">{stats.edges}</div>
-				<div class="text-xs text-gray-500">Edges</div>
+			<div class="metric-cell group relative cursor-help">
+				<div class="metric-label">{m.network_edges()}</div><div class="metric-value">{stats.edges}</div>
 				<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
 					<div class="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 w-56 text-center shadow-lg">
-						Total co-authorship links between researchers. An edge exists when two authors have published together at least once.
+						{m.network_edges_help()}
 						<div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
 					</div>
 				</div>
 			</div>
-			<div class="group relative bg-white rounded-lg shadow p-4 text-center cursor-help">
-				<div class="text-2xl font-bold text-indigo-700">{stats.density.toFixed(4)}</div>
-				<div class="text-xs text-gray-500">Density</div>
+			<div class="metric-cell group relative cursor-help">
+				<div class="metric-label">{m.network_density()}</div><div class="metric-value">{stats.density.toFixed(4)}</div>
 				<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
 					<div class="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 w-56 text-center shadow-lg">
-						Ratio of actual edges to all possible edges (0 to 1). Higher values indicate a more interconnected research community.
+						{m.network_density_help()}
 						<div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
 					</div>
 				</div>
 			</div>
-			<div class="group relative bg-white rounded-lg shadow p-4 text-center cursor-help">
-				<div class="text-2xl font-bold text-indigo-700">{stats.average_degree.toFixed(2)}</div>
-				<div class="text-xs text-gray-500">Avg Degree</div>
+			<div class="metric-cell group relative cursor-help">
+				<div class="metric-label">{m.network_average_degree()}</div><div class="metric-value">{stats.average_degree.toFixed(2)}</div>
 				<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
 					<div class="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 w-56 text-center shadow-lg">
-						Average number of direct co-authors per researcher. Measures typical collaboration breadth within the institution.
+						{m.network_degree_help()}
 						<div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
 					</div>
 				</div>
 			</div>
-			<div class="group relative bg-white rounded-lg shadow p-4 text-center cursor-help">
-				<div class="text-2xl font-bold text-indigo-700">{stats.connected_components}</div>
-				<div class="text-xs text-gray-500">Components</div>
+			<div class="metric-cell group relative cursor-help">
+				<div class="metric-label">{m.network_components()}</div><div class="metric-value">{stats.connected_components}</div>
 				<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
 					<div class="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 w-56 text-center shadow-lg">
-						Number of disconnected subgraphs. A value of 1 means all researchers are reachable through co-authorship chains; higher values indicate isolated research groups.
+						{m.network_components_help()}
 						<div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
 					</div>
 				</div>
 			</div>
 		</div>
 
-		<div class="bg-white rounded-lg shadow overflow-hidden">
+		<div class="flex flex-col gap-5">
+		<details class="surface order-2" ontoggle={(event) => { if (event.currentTarget.open) setTimeout(renderNetwork); }}>
+			<summary class="surface-header cursor-pointer select-none font-semibold text-gray-900">
+				{m.network_visualization()}
+				<span class="ml-2 font-normal text-gray-500">{m.network_visualization_help()}</span>
+			</summary>
+			<div class="border-b border-gray-200">
 			<canvas
 				bind:this={canvasEl}
 				width="900"
 				height="600"
-				aria-label="Co-authorship network graph with {nodes.length} nodes and {edges.length} edges. Use the node list below for tabular data."
+				aria-label={m.network_canvas_label({ nodes: nodes.length, edges: edges.length })}
 				class="w-full"
 				onmousemove={handleMouseMove}
 				onclick={handleCanvasClick}
@@ -335,54 +335,55 @@
 
 		{#if selectedNode ?? hoveredNode}
 			{@const node = (selectedNode ?? hoveredNode)!}
-			<div class="mt-4 bg-white rounded-lg shadow p-4 relative" aria-live="polite">
+			<div class="surface relative p-4" aria-live="polite">
 				{#if selectedNode}
 					<button
 						onclick={() => { selectedNode = null; renderNetwork(); }}
 						class="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-lg leading-none p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-						aria-label="Deselect node"
+						aria-label={m.network_deselect()}
 					>&times;</button>
 				{/if}
 				<h2 class="font-semibold text-gray-900 pr-6">{node.label}</h2>
-				<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-					<div class="bg-blue-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-blue-700">{node.scholar_citations.toLocaleString()}</div>
-						<div class="text-xs text-gray-600">Scholar Citations</div>
+				<div class="mt-3 grid grid-cols-2 divide-x divide-y border-y border-gray-200 sm:grid-cols-3">
+					<div class="p-3">
+						<div class="text-lg font-semibold">{formatNumber(node.scholar_citations)}</div>
+						<div class="text-xs text-gray-600">{m.network_scholar_citations()}</div>
 					</div>
-					<div class="bg-emerald-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-emerald-700">{node.openalex_citations.toLocaleString()}</div>
-						<div class="text-xs text-gray-600">OpenAlex Citations</div>
+					<div class="p-3">
+						<div class="text-lg font-semibold">{formatNumber(node.openalex_citations)}</div>
+						<div class="text-xs text-gray-600">{m.network_openalex_citations()}</div>
 					</div>
-					<div class="bg-indigo-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-indigo-700">{node.publications}</div>
-						<div class="text-xs text-gray-600">Publications</div>
+					<div class="p-3">
+						<div class="text-lg font-semibold">{node.publications}</div>
+						<div class="text-xs text-gray-600">{m.publications_title()}</div>
 					</div>
-					<div class="bg-blue-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-blue-700">{node.h_index}</div>
-						<div class="text-xs text-gray-600">H-Index (computed)</div>
+					<div class="p-3">
+						<div class="text-lg font-semibold">{node.h_index}</div>
+						<div class="text-xs text-gray-600">{m.network_computed_h()}</div>
 					</div>
-					<div class="bg-emerald-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-emerald-700">{node.openalex_h_index}</div>
-						<div class="text-xs text-gray-600">OpenAlex H-Index</div>
+					<div class="p-3">
+						<div class="text-lg font-semibold">{node.openalex_h_index}</div>
+						<div class="text-xs text-gray-600">{m.network_openalex_h()}</div>
 					</div>
-					<div class="bg-purple-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-purple-700">{node.pagerank.toFixed(6)}</div>
+					<div class="p-3">
+						<div class="text-lg font-semibold">{node.pagerank.toFixed(6)}</div>
 						<div class="text-xs text-gray-600">PageRank</div>
 					</div>
 				</div>
-				<a href="/authors/{node.id}?from=/network&fromLabel=Network" class="text-sm text-indigo-600 hover:underline mt-3 inline-block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">View author &rarr;</a>
+				<a href="/authors/{node.id}?from=/network&fromLabel={encodeURIComponent(m.nav_network())}" class="text-sm text-indigo-600 hover:underline mt-3 inline-block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">{m.network_view_author()}</a>
 			</div>
 		{/if}
+		</details>
 
-		<section class="mt-6 bg-white rounded-lg shadow overflow-hidden" aria-labelledby="node-list-heading">
-			<h2 id="node-list-heading" class="text-lg font-semibold text-gray-900 p-4 pb-2">Node List</h2>
+		<section class="surface order-1" aria-labelledby="node-list-heading">
+			<h2 id="node-list-heading" class="surface-header text-lg font-semibold text-gray-900">{m.network_node_list()}</h2>
 			<div class="overflow-x-auto max-h-96 overflow-y-auto">
-				<table class="min-w-full divide-y divide-gray-200" aria-label="Network nodes detail">
+				<table class="data-table" aria-label={m.network_node_details()}>
 					<thead class="bg-gray-50 sticky top-0">
 						<tr>
 							{#each [
-								{ key: 'label' as NodeSortKey, label: 'Name' },
-								{ key: 'publications' as NodeSortKey, label: 'Publications' },
+								{ key: 'label' as NodeSortKey, label: m.authors_name() },
+								{ key: 'publications' as NodeSortKey, label: m.publications_title() },
 								{ key: 'scholar_citations' as NodeSortKey, label: 'Scholar' },
 								{ key: 'openalex_citations' as NodeSortKey, label: 'OpenAlex' },
 								{ key: 'h_index' as NodeSortKey, label: 'H-Index' },
@@ -407,12 +408,12 @@
 								tabindex="0"
 								onclick={() => goto(`/authors/${node.id}?from=/network&fromLabel=Network`)}
 								onkeydown={(e) => handleRowKeydown(e, node.id)}
-								aria-label={`Author: ${node.label}`}
+								aria-label={m.authors_view({ name: node.label })}
 							>
 								<td class="px-4 py-2 text-sm text-indigo-600">{node.label}</td>
 								<td class="px-4 py-2 text-sm text-gray-700">{node.publications}</td>
-								<td class="px-4 py-2 text-sm text-gray-700">{node.scholar_citations.toLocaleString()}</td>
-								<td class="px-4 py-2 text-sm text-gray-700">{node.openalex_citations.toLocaleString()}</td>
+								<td class="px-4 py-2 text-sm text-gray-700">{formatNumber(node.scholar_citations)}</td>
+								<td class="px-4 py-2 text-sm text-gray-700">{formatNumber(node.openalex_citations)}</td>
 								<td class="px-4 py-2 text-sm text-gray-700">{node.h_index}</td>
 								<td class="px-4 py-2 text-sm text-gray-700">{node.pagerank.toFixed(6)}</td>
 							</tr>
@@ -421,5 +422,6 @@
 				</table>
 			</div>
 		</section>
+		</div>
 	{/if}
 </div>

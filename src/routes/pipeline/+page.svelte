@@ -4,6 +4,8 @@
 	import { auth } from '$lib/auth';
 	import { listPipelineRuns, listEnrichmentRuns, launchPipelineRun, getLLMSummary, getLLMModels } from '$lib/api/client';
 	import type { PipelineRun, EnrichmentRunStats, EnrichmentDeferral, LLMSummary, LLMCatalogResponse } from '$lib/api/types';
+	import { ApiClientError, userError } from '$lib/i18n/errors';
+	import * as m from '$lib/paraglide/messages.js';
 
 	let runs = $state<PipelineRun[]>([]);
 	let enrichmentRuns = $state<EnrichmentRunStats[]>([]);
@@ -34,30 +36,32 @@
 	let launchLoading = $state(false);
 
 	const individualStages = [
-		{ id: 'extract',       label: 'Extract',       desc: 'Scrape Google Scholar org list',        detail: 'Scrapes the Google Scholar organization list using Playwright. Reads the UdeC portal and saves raw author names, affiliations, and profile links as output/authors_extracted.csv.' },
-		{ id: 'normalize',     label: 'Normalize',     desc: 'Clean and deduplicate author names',    detail: 'Cleans extracted names: trims whitespace, removes duplicates, separates compound names, and standardizes formatting. Outputs authors_normalized.csv.' },
-		{ id: 'profile',       label: 'Profile',       desc: 'Visit profiles for publications & metrics', detail: 'Visits each author\'s individual Google Scholar profile. Collects publications (title, venue, year, citations), top co-authors, and summary metrics (h-index, i10-index). Outputs CSVs.' },
-		{ id: 'db-profile',    label: 'DB Profile',    desc: 'Profile directly to PostgreSQL',       detail: 'Same as profile, but writes publications, co-author edges, and observed name signatures directly to PostgreSQL tables. Requires a prior migrate run (schema must exist).' },
-		{ id: 'migrate',       label: 'Migrate',       desc: 'Load all CSVs into the database',       detail: 'Loads all CSV files into PostgreSQL using upserts: authors, metrics snapshots, observed signatures, publications with authorships, and coauthor edges. Also recalculates edges from resolved authorships and backfills author positions. Safe to re-run.' },
-		{ id: 'enrich',        label: 'Enrich',        desc: 'Query OpenAlex for DOIs & metadata',   detail: 'Enriches publications by querying the OpenAlex API. Fetches DOIs, abstracts, document types, venue normalization, and external citation counts. Resumable — skips already-enriched publications. Rate-limited to respect API limits.' },
-		{ id: 'disambiguate',  label: 'Disambiguate',  desc: 'AND pipeline: cluster & resolve',      detail: 'Author Name Disambiguation pipeline. Phase 1: namespace clustering via co-author overlap and year range. Phase 2: institutional filter using UdeC directory. Phase 3: BGE-M3 semantic embedding resolver. Optional Phase 4: LLM fallback for persistent ambiguous signatures (enable "Use LLM" below; select Claude or local model).' },
-		{ id: 'indicators',    label: 'Indicators',    desc: 'Compute h-index, PageRank & report',   detail: 'Computes bibliometric and network indicators per author: total publications, total citations, h-index, i10-index, PageRank, betweenness centrality, and clustering coefficient. Writes docs/indicators_report.md and appends a new snapshot for longitudinal analysis.' },
-		{ id: 'evaluate',      label: 'Evaluate',      desc: 'Build gold standard & score AND',      detail: 'Formal evaluation (Phase 6). Builds a gold standard from profile-owner publications, then computes B-Cubed F1, K-metric, and Macro F1 for both the AND system and a name-only baseline. Separates results into easy and hard (ambiguous) entries. Writes docs/evaluation_report.md.' },
+		{ id: 'extract', label: m.pipeline_stage_extract_label(), desc: m.pipeline_stage_extract_desc(), detail: m.pipeline_stage_extract_detail() },
+		{ id: 'normalize', label: m.pipeline_stage_normalize_label(), desc: m.pipeline_stage_normalize_desc(), detail: m.pipeline_stage_normalize_detail() },
+		{ id: 'profile', label: m.pipeline_stage_profile_label(), desc: m.pipeline_stage_profile_desc(), detail: m.pipeline_stage_profile_detail() },
+		{ id: 'db-profile', label: m.pipeline_stage_db_profile_label(), desc: m.pipeline_stage_db_profile_desc(), detail: m.pipeline_stage_db_profile_detail() },
+		{ id: 'migrate', label: m.pipeline_stage_migrate_label(), desc: m.pipeline_stage_migrate_desc(), detail: m.pipeline_stage_migrate_detail() },
+		{ id: 'enrich', label: m.pipeline_stage_enrich_label(), desc: m.pipeline_stage_enrich_desc(), detail: m.pipeline_stage_enrich_detail() },
+		{ id: 'disambiguate', label: m.pipeline_stage_disambiguate_label(), desc: m.pipeline_stage_disambiguate_desc(), detail: m.pipeline_stage_disambiguate_detail() },
+		{ id: 'enrich-validation-evidence', label: m.pipeline_stage_review_enrich_label(), desc: m.pipeline_stage_review_enrich_desc(), detail: m.pipeline_stage_review_enrich_detail() },
+		{ id: 'validation-evidence', label: m.pipeline_stage_review_build_label(), desc: m.pipeline_stage_review_build_desc(), detail: m.pipeline_stage_review_build_detail() },
+		{ id: 'indicators', label: m.pipeline_stage_indicators_label(), desc: m.pipeline_stage_indicators_desc(), detail: m.pipeline_stage_indicators_detail() },
+		{ id: 'evaluate', label: m.pipeline_stage_evaluate_label(), desc: m.pipeline_stage_evaluate_desc(), detail: m.pipeline_stage_evaluate_detail() }
 	];
 
 	const compositeStages = [
 		{
 			id: 'from-csvs',
-			label: 'From CSVs',
-			desc: 'Database pipeline when CSVs already exist',
-			detail: 'Database-side pipeline for when CSVs already exist in output/. Runs 4 stages in order: migrate → enrich → disambiguate → indicators. Each stage is idempotent — safe to re-run if interrupted. Requires CSVs from prior extract, normalize, and profile runs.',
+			label: m.pipeline_stage_csv_label(),
+			desc: m.pipeline_stage_csv_desc(),
+			detail: m.pipeline_stage_csv_detail(),
 			flow: 'migrate → enrich → disambiguate → indicators',
 		},
 		{
 			id: 'full',
-			label: 'Full Pipeline',
-			desc: 'Complete end-to-end from scratch',
-			detail: 'Complete linear pipeline from scratch. Runs all 7 stages in order: extract → normalize → profile → migrate → enrich → disambiguate → indicators. Requires PostgreSQL, network access, and Playwright. The same limit value caps both profile scraping and publication enrichment. Stages are idempotent where documented.',
+			label: m.pipeline_stage_full_label(),
+			desc: m.pipeline_stage_full_desc(),
+			detail: m.pipeline_stage_full_detail(),
 			flow: 'extract → normalize → profile → migrate → enrich → disambiguate → indicators',
 		},
 	];
@@ -79,7 +83,7 @@
 			enrichmentRuns = enrichData.items;
 			llmSummary = llmData;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load pipeline data';
+			error = userError(e, m.pipeline_load_failed());
 		} finally {
 			loading = false;
 		}
@@ -95,7 +99,7 @@
 		try {
 			llmCatalog = await getLLMModels();
 		} catch {
-			llmCatalog = { claude: [], ollama: [], runpod: [] };
+			llmCatalog = { claude: [], ollama: [], runpod: [], zai: [] };
 		} finally {
 			llmCatalogLoading = false;
 		}
@@ -127,7 +131,7 @@
 				force: launchForce,
 				max_llm_budget_usd: launchLlmBudget ? parseFloat(launchLlmBudget) : null
 			});
-			launchStatus = `Pipeline run queued! Run ID: ${result.run_id}, Stage: ${result.stage}`;
+			launchStatus = m.pipeline_queued_success({ runId: result.run_id, stage: result.stage });
 			launchedRunId = result.run_id;
 			if (launchStage === 'enrich' || launchStage === 'from-csvs' || launchStage === 'full') {
 				startProgressPolling(result.run_id);
@@ -145,7 +149,7 @@
 					}
 				} catch {}
 			}
-			launchError = e instanceof Error ? e.message : 'Failed to launch pipeline';
+			launchError = userError(e, m.pipeline_launch_failed());
 		} finally {
 			launchLoading = false;
 		}
@@ -174,26 +178,26 @@
 				if (stats.status === 'success' || stats.status === 'error') {
 					stopPolling();
 					if (stats.status === 'success') {
-						launchStatus = `Pipeline run completed! ${stats.matched} enriched, ${stats.transient_deferred} deferred.`;
+						launchStatus = m.pipeline_completed_success({ matched: stats.matched, deferred: stats.transient_deferred });
 					} else if (stats.status === 'error') {
 						if (stats.error_detail?.code === 'openalex_budget_exhausted') {
 							budgetError = stats.error_detail;
 						} else {
-							launchError = stats.error_message || 'Enrichment failed with an error.';
+							launchError = m.pipeline_enrichment_failed();
 						}
 					}
 					launchedRunId = '';
 				}
 			} catch (e) {
 				pollErrors++;
-				if (e instanceof Error && e.message === 'Authentication required') {
+				if (e instanceof ApiClientError && e.status === 401) {
 					stopPolling();
 					goto('/login');
 					return;
 				}
 				if (pollErrors >= MAX_POLL_ERRORS) {
 					stopPolling();
-					launchError = 'Lost connection to the server. Please refresh the page.';
+					launchError = m.pipeline_connection_lost();
 					launchedRunId = '';
 				}
 			}
@@ -252,37 +256,33 @@
 	}
 </script>
 
-<div>
-	<a href="/" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 mb-3 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">
-		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-		Home
-	</a>
-	<h1 class="text-2xl font-bold text-gray-900 mb-6">Pipeline</h1>
+<div class="app-page">
+	<header class="page-header"><h1 class="page-heading">Pipeline</h1></header>
 
-	<div class="flex gap-1 mb-6 overflow-x-auto" role="tablist" aria-label="Pipeline views">
+	<div class="tabs overflow-x-auto" role="tablist" aria-label={m.pipeline_views()}>
 		<button
 			role="tab"
 			aria-selected={activeTab === 'runs'}
-			class="px-4 py-2 text-sm rounded-md whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500 {activeTab === 'runs' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border hover:bg-gray-50'}"
-			onclick={() => (activeTab = 'runs')}>Pipeline Runs</button>
+			class="tab whitespace-nowrap {activeTab === 'runs' ? 'tab-active' : ''}"
+			onclick={() => (activeTab = 'runs')}>{m.pipeline_runs()}</button>
 		<button
 			role="tab"
 			aria-selected={activeTab === 'enrichment'}
-			class="px-4 py-2 text-sm rounded-md whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500 {activeTab === 'enrichment' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border hover:bg-gray-50'}"
-			onclick={() => (activeTab = 'enrichment')}>Enrichment Runs</button>
+			class="tab whitespace-nowrap {activeTab === 'enrichment' ? 'tab-active' : ''}"
+			onclick={() => (activeTab = 'enrichment')}>{m.pipeline_enrichment_runs()}</button>
 		<button
 			role="tab"
 			aria-selected={activeTab === 'launch'}
-			class="px-4 py-2 text-sm rounded-md whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500 {activeTab === 'launch' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border hover:bg-gray-50'}"
-			onclick={() => (activeTab = 'launch')}>Launch Pipeline</button>
+			class="tab whitespace-nowrap {activeTab === 'launch' ? 'tab-active' : ''}"
+			onclick={() => (activeTab = 'launch')}>{m.pipeline_launch()}</button>
 	</div>
 
 	{#if error}
-		<div role="alert" class="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>
+		<div role="alert" class="notice-error">{error}</div>
 	{/if}
 
 	{#if loading && activeTab !== 'launch'}
-		<div class="bg-white rounded-lg shadow p-8 animate-pulse">
+		<div class="surface p-8 animate-pulse">
 			{#each Array(5) as _}
 				<div class="flex gap-4 py-3 border-b border-gray-100">
 					<div class="h-4 bg-gray-200 rounded w-20"></div>
@@ -295,53 +295,53 @@
 		</div>
 	{:else if activeTab === 'runs'}
 		{#if llmSummary && llmSummary.total_calls > 0}
-			<div class="bg-white rounded-lg shadow p-4 mb-4">
-				<h3 class="text-sm font-semibold text-gray-700 mb-3">LLM Usage Summary (Cumulative)</h3>
-				<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-					<div class="bg-indigo-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-indigo-700">{llmSummary.total_calls.toLocaleString()}</div>
-						<div class="text-xs text-gray-500">Total Calls</div>
+			<section>
+				<h2 class="mb-3 text-sm font-semibold text-gray-700">{m.pipeline_llm_summary()}</h2>
+				<div class="metric-strip">
+					<div class="metric-cell">
+						<div class="metric-value text-lg">{llmSummary.total_calls.toLocaleString()}</div>
+						<div class="metric-label">{m.pipeline_total_calls()}</div>
 					</div>
-					<div class="bg-blue-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-blue-700">{(llmSummary.total_input_tokens + llmSummary.total_output_tokens).toLocaleString()}</div>
-						<div class="text-xs text-gray-500">Total Tokens</div>
+					<div class="metric-cell">
+						<div class="metric-value text-lg">{(llmSummary.total_input_tokens + llmSummary.total_output_tokens).toLocaleString()}</div>
+						<div class="metric-label">{m.pipeline_total_tokens()}</div>
 					</div>
-					<div class="bg-emerald-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-emerald-700">${llmSummary.total_cost_usd.toFixed(4)}</div>
-						<div class="text-xs text-gray-500">Total Cost (USD)</div>
+					<div class="metric-cell">
+						<div class="metric-value text-lg">${llmSummary.total_cost_usd.toFixed(4)}</div>
+						<div class="metric-label">{m.pipeline_total_cost()}</div>
 					</div>
-					<div class="bg-purple-50 rounded p-2 text-center">
-						<div class="text-lg font-bold text-purple-700">{llmSummary.total_signatures_evaluated.toLocaleString()}</div>
-						<div class="text-xs text-gray-500">Signatures Evaluated</div>
+					<div class="metric-cell">
+						<div class="metric-value text-lg">{llmSummary.total_signatures_evaluated.toLocaleString()}</div>
+						<div class="metric-label">{m.pipeline_signatures()}</div>
 					</div>
 				</div>
 				{#if llmSummary.by_model.length > 0}
 					<div class="mt-3 text-xs text-gray-500">
-						By model:
+						{m.pipeline_by_model()}
 						{#each llmSummary.by_model as model}
-							<span class="inline-block bg-gray-100 px-2 py-0.5 rounded ml-1">{model.model_id}: {model.calls} calls, ${model.cost_usd.toFixed(4)}</span>
+							<span class="inline-block bg-gray-100 px-2 py-0.5 rounded ml-1">{model.model_id}: {model.calls} {m.pipeline_calls()}, ${model.cost_usd.toFixed(4)}</span>
 						{/each}
 					</div>
 				{/if}
-			</div>
+			</section>
 		{/if}
-		<div class="bg-white rounded-lg shadow overflow-hidden" role="tabpanel" aria-label="Pipeline runs">
+		<div class="data-shell" role="tabpanel" aria-label="Pipeline runs">
 			{#if runs.length === 0}
-				<p class="p-12 text-center text-gray-500">No pipeline runs recorded yet</p>
+				<p class="p-12 text-center text-gray-500">{m.pipeline_no_runs()}</p>
 			{:else}
 				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200" aria-label="Pipeline runs history">
+					<table class="data-table" aria-label={m.pipeline_history()}>
 						<thead class="bg-gray-50">
 							<tr>
 								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">ID</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Stage</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Source</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Started</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Finished</th>
-								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Duration</th>
-				<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Status</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_stage()}</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_source()}</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_started()}</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_finished()}</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_duration()}</th>
+				<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_status()}</th>
 				<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">LLM</th>
-				<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Notes</th>
+				<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_notes()}</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white divide-y divide-gray-100">
@@ -375,25 +375,25 @@
 			{/if}
 		</div>
 	{:else if activeTab === 'enrichment'}
-		<div class="bg-white rounded-lg shadow overflow-hidden" role="tabpanel" aria-label="Enrichment runs">
-			<h2 class="text-lg font-semibold text-gray-900 p-4 pb-2">Enrichment Run Statistics</h2>
+		<div class="data-shell" role="tabpanel" aria-label="Enrichment runs">
+			<h2 class="text-lg font-semibold text-gray-900 p-4 pb-2">{m.pipeline_enrichment_stats()}</h2>
 			{#if enrichmentRuns.length === 0}
-				<p class="px-4 pb-6 text-gray-500">No enrichment runs recorded yet</p>
+				<p class="px-4 pb-6 text-gray-500">{m.pipeline_no_enrichment()}</p>
 			{:else}
 				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200" aria-label="Enrichment run statistics">
+					<table class="data-table" aria-label={m.pipeline_enrichment_table()}>
 						<thead class="bg-gray-50">
 							<tr>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Run ID</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Source</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Started</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Duration</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Queued</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Matched</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Deferred</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Progress</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Status</th>
-								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Actions</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_run_id()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_source()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_started()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_duration()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_queued()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_matched()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_deferred()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_progress()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_status()}</th>
+								<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_actions()}</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white divide-y divide-gray-100">
@@ -420,7 +420,7 @@
 										<span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full {statusBadgeClass(run.status)}">{run.status}</span>
 									</td>
 									<td>
-										<button class="text-xs text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded" onclick={() => loadDeferrals(run.run_id)} aria-label="View deferrals for run {run.run_id.slice(0, 8)}">Deferrals</button>
+										<button class="text-xs text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded" onclick={() => loadDeferrals(run.run_id)} aria-label={m.pipeline_view_deferrals({ runId: run.run_id.slice(0, 8) })}>{m.pipeline_deferrals()}</button>
 									</td>
 								</tr>
 							{/each}
@@ -431,20 +431,20 @@
 		</div>
 
 		{#if showDeferrals}
-			<section class="mt-6 bg-white rounded-lg shadow overflow-hidden" aria-labelledby="deferrals-heading">
-				<h3 id="deferrals-heading" class="text-lg font-semibold text-gray-900 p-4 pb-2">Deferrals for Run {selectedEnrichmentRunId.slice(0, 8)}...</h3>
+			<section class="surface" aria-labelledby="deferrals-heading">
+				<h3 id="deferrals-heading" class="text-lg font-semibold text-gray-900 p-4 pb-2">{m.pipeline_deferrals_for({ runId: selectedEnrichmentRunId.slice(0, 8) })}</h3>
 				{#if deferrals.length === 0}
-					<p class="p-4 text-gray-500">No deferrals found.</p>
+					<p class="p-4 text-gray-500">{m.pipeline_no_deferrals()}</p>
 				{:else}
 					<div class="overflow-x-auto">
-						<table class="min-w-full divide-y divide-gray-200" aria-label="Enrichment deferrals">
+						<table class="data-table" aria-label={m.pipeline_deferrals_table()}>
 							<thead class="bg-gray-50">
 								<tr>
-									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Pub ID</th>
-									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Phase</th>
-									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Attempts</th>
-									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">HTTP Status</th>
-									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Error</th>
+									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_publication_id()}</th>
+									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_phase()}</th>
+									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_attempts()}</th>
+									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_http_status()}</th>
+									<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.pipeline_error()}</th>
 								</tr>
 							</thead>
 							<tbody class="bg-white divide-y divide-gray-100">
@@ -465,7 +465,7 @@
 		{/if}
 	{:else if activeTab === 'launch'}
 		<div role="tabpanel" aria-label="Launch pipeline">
-			<h2 class="text-lg font-semibold text-gray-900 mb-4">Launch Pipeline Stage</h2>
+			<h2 class="text-lg font-semibold text-gray-900 mb-4">{m.pipeline_launch_stage()}</h2>
 
 			{#if launchStatus}
 				<div role="status" class="mb-4 p-3 bg-green-50 text-green-700 rounded text-sm">{launchStatus}</div>
@@ -475,21 +475,21 @@
 			{/if}
 
 			{#if budgetError}
-				<div role="alert" class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+				<div role="alert" class="notice-warning">
 					<div class="flex items-start gap-3">
 						<svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
 						<div>
-							<p class="text-sm font-medium text-amber-800">{budgetError.message}</p>
+							<p class="text-sm font-medium text-amber-800">{m.pipeline_budget_exhausted()}</p>
 							{#if budgetError.resets_in_seconds != null}
 								<p class="text-xs text-amber-600 mt-1">
-									Budget resets in {fmtBudgetCountdown(budgetError.resets_in_seconds)}.
+									{m.pipeline_budget_resets({ time: fmtBudgetCountdown(budgetError.resets_in_seconds) })}
 									{#if budgetError.resets_at}
 										({new Date(budgetError.resets_at).toLocaleTimeString()})
 									{/if}
 								</p>
 							{/if}
 						</div>
-						<button onclick={() => (budgetError = null)} class="ml-auto text-amber-500 hover:text-amber-700" aria-label="Dismiss">&times;</button>
+						<button onclick={() => (budgetError = null)} class="ml-auto text-amber-500 hover:text-amber-700" aria-label={m.pipeline_dismiss()}>&times;</button>
 					</div>
 				</div>
 			{/if}
@@ -499,25 +499,25 @@
 				<div class="mb-4 bg-white border border-indigo-200 rounded-lg p-4" aria-live="polite">
 					<div class="flex items-center justify-between mb-2">
 						<span class="text-sm font-medium text-indigo-800">
-							{enrichProgress.status === 'running' ? 'Enrichment in progress...' : enrichProgress.status === 'success' ? 'Enrichment complete' : 'Enrichment finished'}
+							{enrichProgress.status === 'running' ? m.pipeline_enrichment_running() : enrichProgress.status === 'success' ? m.pipeline_enrichment_complete() : m.pipeline_enrichment_finished()}
 						</span>
-						<span class="text-xs text-indigo-600">{enrichProgress.publications_processed} / {enrichProgress.publications_queued} publications</span>
+						<span class="text-xs text-indigo-600">{m.pipeline_publications_progress({ processed: enrichProgress.publications_processed, total: enrichProgress.publications_queued })}</span>
 					</div>
 					<div class="w-full bg-gray-200 rounded-full h-3 mb-2 overflow-hidden">
 						<div class="bg-indigo-600 h-3 rounded-full transition-all duration-500 ease-out" style="width: {pct}%"></div>
 					</div>
 					<div class="flex gap-4 text-xs text-gray-500">
-						<span>Matched: <strong class="text-green-600">{enrichProgress.matched}</strong></span>
-						<span>Deferred: <strong class="text-amber-600">{enrichProgress.transient_deferred}</strong></span>
-						<span>Unmatched: <strong>{enrichProgress.unmatched_saved}</strong></span>
-						<span>{pct}% complete</span>
+						<span>{m.pipeline_matched()}: <strong class="text-green-600">{enrichProgress.matched}</strong></span>
+						<span>{m.pipeline_deferred()}: <strong class="text-amber-600">{enrichProgress.transient_deferred}</strong></span>
+						<span>{m.pipeline_unmatched()}: <strong>{enrichProgress.unmatched_saved}</strong></span>
+						<span>{m.pipeline_percent_complete({ percent: pct })}</span>
 					</div>
 				</div>
 			{/if}
 
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-				<section class="bg-white rounded-lg shadow p-5" aria-labelledby="individual-heading">
-					<h3 id="individual-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Individual Stages</h3>
+				<section class="surface p-5" aria-labelledby="individual-heading">
+					<h3 id="individual-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{m.pipeline_individual()}</h3>
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 						{#each individualStages as stage}
 							<button
@@ -533,8 +533,8 @@
 					</div>
 				</section>
 
-				<section class="bg-white rounded-lg shadow p-5" aria-labelledby="composite-heading">
-					<h3 id="composite-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Full Pipelines</h3>
+				<section class="surface p-5" aria-labelledby="composite-heading">
+					<h3 id="composite-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{m.pipeline_full()}</h3>
 					<div class="space-y-2">
 						{#each compositeStages as stage}
 							<button
@@ -561,44 +561,44 @@
 				</section>
 			</div>
 
-			<div class="bg-white rounded-lg shadow p-5">
-				<h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Configuration</h3>
+			<div class="surface p-5">
+				<h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">{m.pipeline_configuration()}</h3>
 
 				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 					<div>
-						<label for="limit" class="block text-xs font-medium text-gray-700 mb-1">Limit (optional)</label>
-						<input id="limit" type="number" bind:value={launchLimit} placeholder="No limit" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
+						<label for="limit" class="block text-xs font-medium text-gray-700 mb-1">{m.pipeline_optional_limit()}</label>
+						<input id="limit" type="number" bind:value={launchLimit} placeholder={m.pipeline_no_limit()} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
 						<p class="mt-1 text-[11px] text-gray-400 leading-relaxed">
 							{#if launchStage === 'full'}
-								Cap for both profile extraction and enrichment.
+								{m.pipeline_limit_full_help()}
 							{:else if launchStage === 'from-csvs'}
-								Cap for enrichment. Useful for partial runs.
+								{m.pipeline_limit_csv_help()}
 							{:else if launchStage === 'profile' || launchStage === 'db-profile'}
-								Max author profiles to visit and scrape.
+								{m.pipeline_limit_profile_help()}
 							{:else if launchStage === 'enrich'}
-								Max publications to enrich via OpenAlex.
+								{m.pipeline_limit_enrich_help()}
 							{/if}
 						</p>
 					</div>
 
 					<div>
-						<label for="csvdir" class="block text-xs font-medium text-gray-700 mb-1">CSV Directory</label>
+						<label for="csvdir" class="block text-xs font-medium text-gray-700 mb-1">{m.pipeline_csv_directory()}</label>
 						<input id="csvdir" type="text" bind:value={launchCsvDir} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
 						<p class="mt-1 text-[11px] text-gray-400 leading-relaxed">
 							{#if launchStage === 'full'}
-								Write/read directory during the run.
+								{m.pipeline_csv_full_help()}
 							{:else if launchStage === 'from-csvs'}
-								Must contain CSVs from prior extract → normalize → profile.
+								{m.pipeline_csv_existing_help()}
 							{:else}
-								CSV source directory for migrate stages.
+								{m.pipeline_csv_migrate_help()}
 							{/if}
 						</p>
 					</div>
 
 					<div>
-						<label for="workers" class="block text-xs font-medium text-gray-700 mb-1">Enrich Workers</label>
+						<label for="workers" class="block text-xs font-medium text-gray-700 mb-1">{m.pipeline_enrich_workers()}</label>
 						<input id="workers" type="number" bind:value={launchEnrichWorkers} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
-						<p class="mt-1 text-[11px] text-gray-400 leading-relaxed">Parallel OpenAlex API workers. Default: 4.</p>
+						<p class="mt-1 text-[11px] text-gray-400 leading-relaxed">{m.pipeline_openalex_workers_help()}</p>
 					</div>
 				</div>
 
@@ -606,78 +606,83 @@
 					<div class="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-4">
 						<div class="flex items-center gap-2">
 							<input type="checkbox" id="buildOnly" bind:checked={launchBuildOnly} class="rounded focus:ring-1 focus:ring-indigo-500" />
-							<label for="buildOnly" class="text-sm text-gray-700">Build gold standard only</label>
+							<label for="buildOnly" class="text-sm text-gray-700">{m.pipeline_build_gold()}</label>
 						</div>
 						<div class="flex-1">
-							<label for="goldpath" class="block text-xs font-medium text-gray-700 mb-1">Gold Standard Path</label>
+							<label for="goldpath" class="block text-xs font-medium text-gray-700 mb-1">{m.pipeline_gold_path()}</label>
 							<input id="goldpath" type="text" bind:value={launchGoldPath} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
 						</div>
 					</div>
 				{/if}
 
-				{#if launchStage === 'disambiguate' || launchStage === 'from-csvs' || launchStage === 'full'}
+				{#if launchStage === 'disambiguate' || launchStage === 'validation-evidence' || launchStage === 'from-csvs' || launchStage === 'full'}
 					<div class="mt-4 pt-4 border-t border-gray-100 space-y-3">
 						<div class="flex items-center gap-2">
 							<input type="checkbox" id="useLlm" bind:checked={launchUseLlm} class="rounded focus:ring-1 focus:ring-indigo-500" onchange={() => { if (launchUseLlm && !llmCatalog) loadLLMCatalog(); }} />
-							<label for="useLlm" class="text-sm font-medium text-gray-700">Use LLM fallback</label>
+								<label for="useLlm" class="text-sm font-medium text-gray-700">{launchStage === 'validation-evidence' ? m.pipeline_generate_evidence() : m.pipeline_use_llm()}</label>
 							{#if launchUseLlm && !llmCatalog && !llmCatalogLoading}
-								<button onclick={loadLLMCatalog} class="text-xs text-indigo-600 hover:underline focus:outline-none focus:ring-1 focus:ring-indigo-500 rounded" type="button">Load available models</button>
+								<button onclick={loadLLMCatalog} class="text-xs text-indigo-600 hover:underline focus:outline-none focus:ring-1 focus:ring-indigo-500 rounded" type="button">{m.pipeline_load_models()}</button>
 							{/if}
 							{#if llmCatalogLoading}
-								<span class="text-xs text-gray-400">Loading models...</span>
+								<span class="text-xs text-gray-400">{m.pipeline_loading_models()}</span>
 							{/if}
 						</div>
 
-						{#if launchUseLlm}
-							<div class="ml-6 space-y-3">
-								<div>
-									<label for="llmProvider" class="block text-xs font-medium text-gray-700 mb-1">LLM Provider</label>
+							{#if launchUseLlm}
+								<div class="ml-6 space-y-3">
+									{#if launchStage === 'validation-evidence'}
+										<p class="rounded-md bg-indigo-50 p-3 text-xs text-indigo-800">{m.pipeline_evidence_help()}</p>
+									{:else}
+									<div>
+									<label for="llmProvider" class="block text-xs font-medium text-gray-700 mb-1">{m.pipeline_provider()}</label>
 									<select id="llmProvider" bind:value={launchLlmProvider} onchange={(e) => onLlmProviderChange((e.target as HTMLSelectElement).value)} class="w-56 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900 bg-white">
 										<option value="claude">Claude (Anthropic)</option>
 										<option value="ollama">Ollama (local)</option>
 										<option value="runpod">RunPod (remote Ollama)</option>
+										<option value="zai">{m.pipeline_provider_zai()}</option>
 									</select>
 								</div>
 
 								{#if llmCatalog && (llmCatalog[launchLlmProvider as keyof LLMCatalogResponse]?.length || 0) > 0}
 									<div>
-										<label for="llmModel" class="block text-xs font-medium text-gray-700 mb-1">Model</label>
+										<label for="llmModel" class="block text-xs font-medium text-gray-700 mb-1">{m.pipeline_model()}</label>
 										<select id="llmModel" bind:value={launchLlmModel} class="w-64 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900 bg-white">
-											<option value="">Default (config)</option>
+											<option value="">{m.pipeline_default_model()}</option>
 											{#each llmCatalog[launchLlmProvider as keyof LLMCatalogResponse] as model}
 												<option value={model}>{model}</option>
 											{/each}
 										</select>
-										<p class="mt-0.5 text-[10px] text-gray-400">Select a specific model, or use "Default" for the server-configured model.</p>
+										<p class="mt-0.5 text-[10px] text-gray-400">{m.pipeline_model_help()}</p>
 									</div>
 								{/if}
 
 								<div>
-									<label for="llmWorkers" class="block text-xs font-medium text-gray-700 mb-1">LLM Workers (optional)</label>
-									<input id="llmWorkers" type="number" min="1" max="64" bind:value={launchLlmWorkers} placeholder="Provider default" class="w-32 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
-									<p class="mt-0.5 text-[10px] text-gray-400">Parallel workers for LLM calls. Defaults: Claude=2, Ollama=4, RunPod=20. Reduce for local models to avoid saturation (e.g. Ollama=1).</p>
+									<label for="llmWorkers" class="block text-xs font-medium text-gray-700 mb-1">{m.pipeline_llm_workers()}</label>
+									<input id="llmWorkers" type="number" min="1" max="64" bind:value={launchLlmWorkers} placeholder={m.pipeline_provider_default()} class="w-32 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
+									<p class="mt-0.5 text-[10px] text-gray-400">{m.pipeline_workers_help()}</p>
 								</div>
 
 								{#if launchLlmProvider === 'claude'}
 									<div>
-										<label for="llmBudget" class="block text-xs font-medium text-gray-700 mb-1">Max budget (USD, optional)</label>
-										<input id="llmBudget" type="number" step="0.01" min="0" bind:value={launchLlmBudget} placeholder="No limit" class="w-48 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
-										<p class="mt-0.5 text-[10px] text-gray-400">If the estimated cost exceeds this, Claude is skipped entirely — no API calls are made. Leave empty for no limit.</p>
+										<label for="llmBudget" class="block text-xs font-medium text-gray-700 mb-1">{m.pipeline_budget()}</label>
+										<input id="llmBudget" type="number" step="0.01" min="0" bind:value={launchLlmBudget} placeholder={m.pipeline_no_limit()} class="w-48 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
+										<p class="mt-0.5 text-[10px] text-gray-400">{m.pipeline_budget_help()}</p>
 									</div>
 								{/if}
-								{#if launchStage === 'disambiguate'}
+									{#if launchStage === 'disambiguate'}
 									<div class="flex items-center gap-2">
 										<input type="checkbox" id="force" bind:checked={launchForce} class="rounded focus:ring-1 focus:ring-indigo-500" />
-										<label for="force" class="text-sm font-medium text-red-700">Force reset previous resolutions</label>
+										<label for="force" class="text-sm font-medium text-red-700">{m.pipeline_force_reset()}</label>
 									</div>
-								{/if}
-							</div>
+									{/if}
+									{/if}
+								</div>
 						{/if}
 					</div>
 				{/if}
 
 				<button onclick={handleLaunch} disabled={launchLoading} class="mt-5 w-full py-2.5 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors" aria-busy={launchLoading}>
-					{launchLoading ? 'Launching...' : 'Launch Pipeline'}
+					{launchLoading ? m.pipeline_launching() : m.pipeline_launch_button()}
 				</button>
 			</div>
 		</div>

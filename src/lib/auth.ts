@@ -14,10 +14,14 @@ function createAuth() {
 			}
 			store.set(true);
 		},
+		session() {
+			store.set(true);
+		},
 		logout() {
 			if (browser) {
 				localStorage.removeItem('access_token');
 				localStorage.removeItem('refresh_token');
+				localStorage.removeItem('active_project_id');
 			}
 			store.set(false);
 		}

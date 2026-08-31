@@ -4,11 +4,14 @@
 	import { auth } from '$lib/auth';
 	import { getEvaluation } from '$lib/api/client';
 	import type { EvaluationResult } from '$lib/api/types';
+	import * as m from '$lib/paraglide/messages.js';
+	import { formatPercent } from '$lib/i18n/format';
+	import { technicalError, userError } from '$lib/i18n/errors';
 
 	let evaluation = $state<EvaluationResult | null>(null);
 	let loading = $state(true);
 	let error = $state('');
-	let goldMissing = $state(false);
+	let proxyMissing = $state(false);
 
 	$effect(() => {
 		if (browser && !$auth) goto('/login');
@@ -17,15 +20,15 @@
 	async function fetchData() {
 		loading = true;
 		error = '';
-		goldMissing = false;
+		proxyMissing = false;
 		try {
 			evaluation = await getEvaluation();
 		} catch (e) {
-			const msg = e instanceof Error ? e.message : 'Failed to load evaluation';
-			if (msg.includes('Gold standard not found')) {
-				goldMissing = true;
+			const msg = technicalError(e) ?? '';
+			if (msg.includes('Profile-owner proxy not found')) {
+				proxyMissing = true;
 			} else {
-				error = msg;
+				error = userError(e, m.evaluation_load_error());
 			}
 		} finally {
 			loading = false;
@@ -51,28 +54,21 @@
 	};
 </script>
 
-<div>
-	<a href="/" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 mb-3 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">
-		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-		Home
-	</a>
-	<h1 class="text-2xl font-bold text-gray-900 mb-6">AND Evaluation</h1>
+<div class="app-page">
+	<header class="page-header"><div><p class="page-kicker">{m.evaluation_kicker()}</p><h1 class="page-heading">{m.evaluation_title()}</h1><p class="page-description">{m.evaluation_description()}</p></div><a href="/validation/gold" class="btn-link">{m.evaluation_open_gold()}</a></header>
 
-	{#if goldMissing}
-		<div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-			<svg class="w-12 h-12 mx-auto mb-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-			</svg>
-			<h2 class="text-lg font-semibold text-blue-800 mb-2">No evaluation data yet</h2>
-			<p class="text-sm text-blue-700 mb-4">
-				Launch the evaluation stage from the Pipeline to generate the gold standard and compute AND metrics.
+	{#if proxyMissing}
+		<div class="empty-state">
+			<h2 class="text-lg font-semibold text-gray-900 mb-2">{m.evaluation_missing_title()}</h2>
+			<p class="text-sm text-gray-600 mb-4">
+				{m.evaluation_missing_help()}
 			</p>
-			<a href="/pipeline" class="inline-block px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-				Go to Pipeline
+			<a href="/pipeline" class="btn-primary">
+				{m.evaluation_go_pipeline()}
 			</a>
 		</div>
 	{:else if error}
-		<div role="alert" class="p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>
+		<div role="alert" class="notice-error">{error}</div>
 	{:else if loading}
 		<div class="space-y-6 animate-pulse">
 			<div class="grid grid-cols-3 gap-4">
@@ -86,24 +82,15 @@
 			</div>
 		</div>
 	{:else if evaluation}
-		<div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-			<div class="bg-white rounded-lg shadow p-4 text-center">
-				<div class="text-2xl font-bold text-indigo-700">{evaluation.gold_total}</div>
-				<div class="text-xs text-gray-500">Gold Standard (Total)</div>
-			</div>
-			<div class="bg-white rounded-lg shadow p-4 text-center">
-				<div class="text-2xl font-bold text-green-700">{evaluation.gold_easy}</div>
-				<div class="text-xs text-gray-500">Easy Entries</div>
-			</div>
-			<div class="bg-white rounded-lg shadow p-4 text-center">
-				<div class="text-2xl font-bold text-amber-700">{evaluation.gold_hard}</div>
-				<div class="text-xs text-gray-500">Hard (Ambiguous) Entries</div>
-			</div>
+		<div class="metric-strip lg:grid-cols-3">
+			<div class="metric-cell"><div class="metric-label">{m.evaluation_proxy_total()}</div><div class="metric-value">{evaluation.gold_total}</div></div>
+			<div class="metric-cell"><div class="metric-label">{m.evaluation_proxy_easy()}</div><div class="metric-value">{evaluation.gold_easy}</div></div>
+			<div class="metric-cell"><div class="metric-label">{m.evaluation_proxy_hard()}</div><div class="metric-value">{evaluation.gold_hard}</div></div>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-			<section class="bg-white rounded-lg shadow p-6" aria-labelledby="and-heading">
-				<h2 id="and-heading" class="text-lg font-semibold text-gray-900 mb-4">AND System</h2>
+			<section class="surface p-6" aria-labelledby="and-heading">
+				<h2 id="and-heading" class="text-lg font-semibold text-gray-900 mb-4">{m.evaluation_system()}</h2>
 				<dl class="space-y-2">
 					{#each Object.entries(evaluation.system) as [key, val]}
 						<div class="flex justify-between items-center py-1 border-b border-gray-50">
@@ -113,12 +100,12 @@
 					{/each}
 				</dl>
 				<div class="mt-3 pt-2 border-t border-gray-200">
-					<span class="text-sm text-gray-600">Coverage: <strong>{(evaluation.system_coverage * 100).toFixed(1)}%</strong></span>
+					<span class="text-sm text-gray-600">{m.evaluation_coverage()}: <strong>{formatPercent(evaluation.system_coverage)}</strong></span>
 				</div>
 			</section>
 
-			<section class="bg-white rounded-lg shadow p-6" aria-labelledby="baseline-heading">
-				<h2 id="baseline-heading" class="text-lg font-semibold text-gray-900 mb-4">Baseline (Name Only)</h2>
+			<section class="surface p-6" aria-labelledby="baseline-heading">
+				<h2 id="baseline-heading" class="text-lg font-semibold text-gray-900 mb-4">{m.evaluation_baseline()}</h2>
 				<dl class="space-y-2">
 					{#each Object.entries(evaluation.baseline) as [key, val]}
 						<div class="flex justify-between items-center py-1 border-b border-gray-50">
@@ -132,12 +119,12 @@
 
 		{#if evaluation.system.b3_f1 != null && evaluation.baseline.b3_f1 != null}
 			{@const improvement = Number(evaluation.system.b3_f1) - Number(evaluation.baseline.b3_f1)}
-			<div class="bg-white rounded-lg shadow p-6">
-				<h2 class="text-lg font-semibold text-gray-900 mb-2">Improvement Over Baseline</h2>
+			<div class="surface p-6">
+				<h2 class="text-lg font-semibold text-gray-900 mb-2">{m.evaluation_improvement()}</h2>
 				<p class="text-3xl font-bold {improvement >= 0 ? 'text-green-700' : 'text-red-700'}">
 					{improvement >= 0 ? '+' : ''}{improvement.toFixed(4)}
 				</p>
-				<p class="text-sm text-gray-500 mt-1">B-Cubed F1 improvement</p>
+				<p class="text-sm text-gray-500 mt-1">{m.evaluation_f1_improvement()}</p>
 			</div>
 		{/if}
 	{/if}

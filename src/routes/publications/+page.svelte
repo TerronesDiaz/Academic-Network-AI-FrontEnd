@@ -4,6 +4,8 @@
 	import { auth } from '$lib/auth';
 	import { listPublications } from '$lib/api/client';
 	import type { PublicationItem } from '$lib/api/types';
+	import * as m from '$lib/paraglide/messages.js';
+	import { userError } from '$lib/i18n/errors';
 
 	type PubSortKey = 'title' | 'publication_year' | 'venue' | 'document_type' | 'citations_count' | 'scholar_citations';
 
@@ -39,7 +41,7 @@
 			publications = data.items;
 			total = data.total;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to fetch publications';
+			error = userError(e, m.publications_load_error());
 		} finally {
 			loading = false;
 		}
@@ -77,66 +79,67 @@
 	}
 
 	const sortableCols: { key: PubSortKey; label: string }[] = [
-		{ key: 'title',              label: 'Title' },
-		{ key: 'publication_year',   label: 'Year' },
-		{ key: 'venue',              label: 'Venue' },
-		{ key: 'document_type',      label: 'Type' },
+		{ key: 'title',              label: m.publications_title_column() },
+		{ key: 'publication_year',   label: m.publications_year() },
+		{ key: 'venue',              label: m.publications_venue() },
+		{ key: 'document_type',      label: m.publications_type() },
 		{ key: 'citations_count',    label: 'OpenAlex' },
 		{ key: 'scholar_citations',  label: 'Scholar' },
 	];
+
+	const documentTypeLabels: Record<string, string> = {
+		article: m.publications_article(), book: m.publications_book(),
+		'book-chapter': m.publications_book_chapter(), 'conference-paper': m.publications_conference_paper(),
+		proceedings: m.publications_proceedings(), preprint: m.publications_preprint(),
+		report: m.publications_report(), thesis: m.publications_thesis(), other: m.publications_other()
+	};
 </script>
 
-<div>
-	<a href="/" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 mb-3 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">
-		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-		Home
-	</a>
-	<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-		<h1 class="text-2xl font-bold text-gray-900">Publications</h1>
-		<form class="flex gap-2 flex-wrap" role="search" aria-label="Search publications" onsubmit={(e) => { e.preventDefault(); searchPublications(); }}>
-			<label for="pub-search" class="sr-only">Search title or venue</label>
+<div class="app-page">
+	<header class="page-header"><h1 class="page-heading">{m.publications_title()}</h1></header>
+	<form class="toolbar" role="search" aria-label={m.publications_search_label()} onsubmit={(e) => { e.preventDefault(); searchPublications(); }}>
+			<label for="pub-search" class="sr-only">{m.publications_search_help()}</label>
 			<input
 				id="pub-search"
 				type="search"
-				placeholder="Search title or venue..."
+				placeholder={m.publications_search_placeholder()}
 				bind:value={search}
-				class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+				class="min-w-64 rounded-md border px-3 py-2 text-sm"
 			/>
-			<label for="pub-year" class="sr-only">Publication year</label>
+			<label for="pub-year" class="sr-only">{m.publications_year()}</label>
 			<input
 				id="pub-year"
 				type="number"
-				placeholder="Year"
+				placeholder={m.publications_year()}
 				bind:value={year}
-				class="w-24 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+				class="w-24 rounded-md border px-3 py-2 text-sm"
 			/>
-			<label for="pub-type" class="sr-only">Document type</label>
+			<label for="pub-type" class="sr-only">{m.publications_type()}</label>
 			<select
 				id="pub-type"
 				bind:value={type}
-				class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+				class="rounded-md border px-3 py-2 text-sm"
 			>
-				<option value="">All types</option>
-				<option value="article">Article</option>
-				<option value="book">Book</option>
-				<option value="book-chapter">Book Chapter</option>
-				<option value="conference-paper">Conference Paper</option>
-				<option value="proceedings">Proceedings</option>
-				<option value="preprint">Preprint</option>
-				<option value="report">Report</option>
-				<option value="thesis">Thesis</option>
-				<option value="other">Other</option>
+				<option value="">{m.publications_all_types()}</option>
+				<option value="article">{m.publications_article()}</option>
+				<option value="book">{m.publications_book()}</option>
+				<option value="book-chapter">{m.publications_book_chapter()}</option>
+				<option value="conference-paper">{m.publications_conference_paper()}</option>
+				<option value="proceedings">{m.publications_proceedings()}</option>
+				<option value="preprint">{m.publications_preprint()}</option>
+				<option value="report">{m.publications_report()}</option>
+				<option value="thesis">{m.publications_thesis()}</option>
+				<option value="other">{m.publications_other()}</option>
 			</select>
-			<button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Search</button>
-		</form>
-	</div>
+			<button type="submit" class="btn-primary">{m.common_search()}</button>
+	</form>
 
 	{#if error}
-		<div role="alert" class="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>
+		<div role="alert" class="notice-error">{error}</div>
 	{/if}
 
 	{#if loading}
-		<div class="bg-white rounded-lg shadow p-8 animate-pulse">
+		<div class="surface p-8 animate-pulse">
 			{#each Array(6) as _}
 				<div class="flex gap-4 py-3 border-b border-gray-100">
 					<div class="h-4 bg-gray-200 rounded w-2/5"></div>
@@ -147,15 +150,15 @@
 			{/each}
 		</div>
 	{:else if publications.length === 0}
-		<div class="bg-white rounded-lg shadow p-12 text-center">
-			<p class="text-gray-600 text-lg font-medium">No publications found</p>
-			<p class="text-gray-500 text-sm mt-1">Try adjusting your search criteria</p>
+		<div class="empty-state">
+			<p class="text-gray-600 text-lg font-medium">{m.publications_empty()}</p>
+			<p class="text-gray-500 text-sm mt-1">{m.publications_empty_help()}</p>
 		</div>
 	{:else}
-		<p class="text-sm text-gray-600 mb-3" role="status">Showing {publications.length} of {total} publications{sortKey ? ' \u00b7 sorted by ' + sortKey.replace(/_/g, ' ') + ' (' + sortDir + ')' : ''}</p>
-		<div class="bg-white rounded-lg shadow overflow-hidden">
-			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-gray-200" aria-label="Publications list">
+		<p class="text-sm text-gray-600 mb-3" role="status">{m.publications_showing({ shown: publications.length, total })}</p>
+		<div class="data-shell">
+			<div class="data-scroll">
+				<table class="data-table" aria-label={m.publications_list()}>
 					<thead class="bg-gray-50">
 						<tr>
 							{#each sortableCols as col}
@@ -173,12 +176,12 @@
 								tabindex="0"
 								onclick={() => goto(`/publications/${pub.id}`)}
 								onkeydown={(e) => handleRowKeydown(e, pub.id)}
-								aria-label={`Publication: ${pub.title}`}
+								aria-label={m.publications_view({ title: pub.title })}
 							>
 								<td class="px-4 py-3 text-sm text-gray-900 max-w-lg truncate">{pub.title}</td>
 								<td class="px-4 py-3 text-sm text-gray-600">{pub.publication_year ?? '—'}</td>
 								<td class="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{pub.venue || '—'}</td>
-								<td class="px-4 py-3 text-sm text-gray-600">{pub.document_type || '—'}</td>
+								<td class="px-4 py-3 text-sm text-gray-600">{pub.document_type ? (documentTypeLabels[pub.document_type] ?? pub.document_type) : '—'}</td>
 								<td class="px-4 py-3 text-sm text-gray-600">{pub.openalex_citations ?? pub.citations_count}</td>
 								<td class="px-4 py-3 text-sm text-gray-600">{pub.scholar_citations ?? '—'}</td>
 							</tr>
@@ -188,9 +191,9 @@
 			</div>
 		</div>
 		<div class="flex items-center justify-between mt-4">
-			<button onclick={() => { offset = Math.max(0, offset - limit); fetchPublications(); }} disabled={offset === 0} class="px-4 py-2 text-sm border border-gray-300 rounded-md disabled:opacity-40 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">Previous</button>
-			<span class="text-sm text-gray-600">Page {Math.floor(offset / limit) + 1} of {Math.ceil(total / limit) || 1}</span>
-			<button onclick={() => { offset = offset + limit; fetchPublications(); }} disabled={offset + limit >= total} class="px-4 py-2 text-sm border border-gray-300 rounded-md disabled:opacity-40 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">Next</button>
+			<button onclick={() => { offset = Math.max(0, offset - limit); fetchPublications(); }} disabled={offset === 0} class="btn-secondary">{m.common_previous()}</button>
+			<span class="text-sm text-gray-600">{m.common_page_of({ page: Math.floor(offset / limit) + 1, total: Math.ceil(total / limit) || 1 })}</span>
+			<button onclick={() => { offset = offset + limit; fetchPublications(); }} disabled={offset + limit >= total} class="btn-secondary">{m.common_next()}</button>
 		</div>
 	{/if}
 </div>

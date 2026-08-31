@@ -3,18 +3,38 @@
 	import { page } from '$app/stores';
 	import { auth } from '$lib/auth';
 	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { logout as apiLogout } from '$lib/api/client';
+	import { onMount } from 'svelte';
+	import { restoreCookieSession } from '$lib/api/client';
+	import LanguageSelector from '$lib/components/LanguageSelector.svelte';
+	import * as m from '$lib/paraglide/messages.js';
 
 	let { children } = $props();
 	let loggedIn = $derived($auth);
+	let sessionReady = $state(false);
 	let menuOpen = $state(false);
 	let menuBtn = $state<HTMLButtonElement | undefined>(undefined);
 
-	function handleLogout() {
+	onMount(async () => {
+		if (!$auth) await restoreCookieSession();
+		sessionReady = true;
+	});
+
+	$effect(() => {
+		if (!browser || !sessionReady) return;
+		const pathname = $page.url.pathname;
+		if (!$auth && pathname !== '/login') {
+			void goto('/login', { replaceState: true });
+		} else if ($auth && pathname === '/login') {
+			void goto('/projects', { replaceState: true });
+		}
+	});
+
+	async function handleLogout() {
 		menuOpen = false;
-		apiLogout();
-		auth.logout();
-		goto('/login');
+		await apiLogout();
+		await goto('/login', { replaceState: true });
 	}
 
 	function closeMenu() {
@@ -23,12 +43,12 @@
 	}
 
 	const navItems = [
-		{ href: '/authors', label: 'Authors' },
-		{ href: '/publications', label: 'Publications' },
-		{ href: '/network', label: 'Network' },
-		{ href: '/indicators', label: 'Indicators' },
-		{ href: '/evaluation', label: 'Evaluation' },
-		{ href: '/pipeline', label: 'Pipeline' },
+		{ href: '/projects', label: m.nav_projects() },
+		{ href: '/validation', label: m.nav_validation() },
+		{ href: '/authors', label: m.nav_authors() },
+		{ href: '/publications', label: m.nav_publications() },
+		{ href: '/network', label: m.nav_network() },
+		{ href: '/indicators', label: m.nav_indicators() },
 	];
 
 	function isCurrent(href: string) {
@@ -37,24 +57,28 @@
 </script>
 
 <svelte:head>
-	<title>Academic Network</title>
+	<title>AcademicNetwork</title>
 </svelte:head>
 
-{#if loggedIn}
+{#if !sessionReady && !loggedIn}
+	<div class="min-h-screen grid place-items-center bg-gray-50" role="status" aria-live="polite">
+		<p class="text-sm text-gray-500">{m.session_checking()}</p>
+	</div>
+{:else if loggedIn}
 	<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-indigo-700 focus:text-white focus:px-4 focus:py-2 focus:rounded">
-		Skip to main content
+		{m.nav_skip_content()}
 	</a>
 
 	<div class="min-h-screen bg-gray-50">
-		<nav class="bg-indigo-700 text-white shadow-lg" aria-label="Main navigation">
+		<nav class="border-b border-gray-200 bg-white text-gray-700" aria-label={m.nav_main()}>
 			<div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-				<div class="flex items-center justify-between h-16">
+				<div class="flex h-14 items-center justify-between">
 					<div class="flex items-center gap-2">
-						<a href="/" class="font-bold text-lg tracking-tight" aria-label="Academic Network home">AcademicNetwork</a>
+						<a href="/" class="text-base font-semibold tracking-tight text-gray-950" aria-label={m.nav_home()}>AcademicNetwork</a>
 						<button
 							bind:this={menuBtn}
-							class="sm:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-white"
-							aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+							class="rounded p-2 text-gray-600 sm:hidden"
+							aria-label={menuOpen ? m.nav_close_menu() : m.nav_open_menu()}
 							aria-expanded={menuOpen}
 							onclick={() => (menuOpen = !menuOpen)}
 						>
@@ -63,39 +87,42 @@
 							</svg>
 						</button>
 					</div>
-					<div class="hidden sm:flex items-center gap-1">
+					<div class="hidden h-full items-center gap-1 sm:flex">
+						<LanguageSelector compact />
 						{#each navItems as item}
 							<a
 								href={item.href}
-								class="px-3 py-2 rounded text-sm font-medium transition-colors {isCurrent(item.href) ? 'bg-indigo-600' : 'hover:bg-indigo-600'}"
+							class="flex h-full items-center border-b-2 px-3 text-sm transition-colors {isCurrent(item.href) ? 'border-indigo-600 font-semibold text-indigo-800' : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-950'}"
 								aria-current={isCurrent(item.href) ? 'page' : undefined}
 							>{item.label}</a>
 						{/each}
-						<button onclick={handleLogout} class="ml-4 px-3 py-1 bg-indigo-500 rounded text-sm hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-white">Logout</button>
+						<button onclick={handleLogout} class="ml-3 text-sm text-gray-600 hover:text-gray-950 hover:underline">{m.nav_logout()}</button>
 					</div>
 				</div>
 			</div>
 			{#if menuOpen}
-				<div class="sm:hidden px-4 pb-4 space-y-1" role="menu">
+				<div class="space-y-1 border-t border-gray-200 px-4 py-3 sm:hidden" role="menu">
 					{#each navItems as item}
 						<a
 							href={item.href}
-							class="block px-3 py-2 rounded text-sm transition-colors {isCurrent(item.href) ? 'bg-indigo-600' : 'hover:bg-indigo-600'}"
+							class="block border-l-2 px-3 py-2 text-sm {isCurrent(item.href) ? 'border-indigo-600 font-semibold text-indigo-800' : 'border-transparent text-gray-700'}"
 							aria-current={isCurrent(item.href) ? 'page' : undefined}
 							role="menuitem"
 							onclick={closeMenu}
 						>{item.label}</a>
 					{/each}
-					<button onclick={handleLogout} class="block w-full text-left px-3 py-2 rounded hover:bg-indigo-600 text-sm focus:outline-none focus:ring-2 focus:ring-white" role="menuitem">Logout</button>
+					<div class="px-3 py-2"><LanguageSelector /></div>
+					<button onclick={handleLogout} class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:underline" role="menuitem">{m.nav_logout()}</button>
 				</div>
 			{/if}
 		</nav>
-		<main id="main-content" class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6" tabindex="-1">
+		<main id="main-content" class="mx-auto max-w-screen-2xl px-4 py-5 sm:px-6 lg:px-8" tabindex="-1">
 			{@render children()}
 		</main>
 	</div>
 {:else}
 	<div class="min-h-screen bg-gray-50">
+		<div class="absolute right-4 top-4 z-10 text-gray-700"><LanguageSelector /></div>
 		<main class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 			{@render children()}
 		</main>

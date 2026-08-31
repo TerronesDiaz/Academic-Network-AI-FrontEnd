@@ -4,6 +4,8 @@
 	import { auth } from '$lib/auth';
 	import { listAuthors } from '$lib/api/client';
 	import type { Author } from '$lib/api/types';
+	import * as m from '$lib/paraglide/messages.js';
+	import { userError } from '$lib/i18n/errors';
 
 	type AuthorSortKey = 'canonical_name' | 'affiliation' | 'email_domain' | 'base_citations' | 'openalex_citations' | 'is_active';
 
@@ -40,7 +42,7 @@
 			authors = data.items;
 			total = data.total;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to fetch authors';
+			error = userError(e, m.authors_load_error());
 		} finally {
 			loading = false;
 		}
@@ -78,44 +80,38 @@
 	}
 
 	const sortableCols: { key: AuthorSortKey; label: string }[] = [
-		{ key: 'canonical_name',     label: 'Name' },
-		{ key: 'affiliation',        label: 'Affiliation' },
-		{ key: 'email_domain',       label: 'Email' },
+		{ key: 'canonical_name',     label: m.authors_name() },
+		{ key: 'affiliation',        label: m.authors_affiliation() },
+		{ key: 'email_domain',       label: m.authors_email() },
 		{ key: 'base_citations',     label: 'Scholar' },
 		{ key: 'openalex_citations', label: 'OpenAlex' },
-		{ key: 'is_active',          label: 'Status' },
+		{ key: 'is_active',          label: m.authors_status() },
 	];
 </script>
 
-<div>
-	<a href="/" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 mb-3 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded">
-		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-		Home
-	</a>
-	<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-		<h1 class="text-2xl font-bold text-gray-900">Authors</h1>
-		<form class="flex gap-2" role="search" aria-label="Search authors" onsubmit={(e) => { e.preventDefault(); searchAuthors(); }}>
-			<label for="author-search" class="sr-only">Search name or affiliation</label>
+<div class="app-page">
+	<header class="page-header"><h1 class="page-heading">{m.authors_title()}</h1></header>
+	<form class="toolbar" role="search" aria-label={m.authors_search_label()} onsubmit={(e) => { e.preventDefault(); searchAuthors(); }}>
+			<label for="author-search" class="sr-only">{m.authors_search_help()}</label>
 			<input
 				id="author-search"
 				type="search"
-				placeholder="Search name, affiliation..."
+				placeholder={m.authors_search_placeholder()}
 				bind:value={search}
-				class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+				class="min-w-64 rounded-md border px-3 py-2 text-sm"
 			/>
 			<button
 				type="submit"
-				class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-			>Search</button>
-		</form>
-	</div>
+				class="btn-primary"
+			>{m.common_search()}</button>
+	</form>
 
 	{#if error}
-		<div role="alert" class="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>
+		<div role="alert" class="notice-error">{error}</div>
 	{/if}
 
 	{#if loading}
-		<div class="bg-white rounded-lg shadow p-8 animate-pulse">
+		<div class="surface p-8 animate-pulse">
 			{#each Array(6) as _}
 				<div class="flex gap-4 py-3 border-b border-gray-100">
 					<div class="h-4 bg-gray-200 rounded w-1/4"></div>
@@ -127,15 +123,15 @@
 			{/each}
 		</div>
 	{:else if authors.length === 0}
-		<div class="bg-white rounded-lg shadow p-12 text-center">
-			<p class="text-gray-600 text-lg font-medium">No authors found</p>
-			<p class="text-gray-500 text-sm mt-1">Try adjusting your search criteria</p>
+		<div class="empty-state">
+			<p class="text-gray-600 text-lg font-medium">{m.authors_empty()}</p>
+			<p class="text-gray-500 text-sm mt-1">{m.authors_empty_help()}</p>
 		</div>
 	{:else}
-		<p class="text-sm text-gray-600 mb-3" role="status">Showing {authors.length} of {total} authors{sortKey ? ' \u00b7 sorted by ' + sortKey.replace(/_/g, ' ') + ' (' + sortDir + ')' : ''}</p>
-		<div class="bg-white rounded-lg shadow overflow-hidden">
-			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-gray-200" aria-label="Authors list">
+		<p class="text-sm text-gray-600 mb-3" role="status">{m.authors_showing({ shown: authors.length, total })}</p>
+		<div class="data-shell">
+			<div class="data-scroll">
+				<table class="data-table" aria-label={m.authors_list()}>
 					<thead class="bg-gray-50">
 						<tr>
 							{#each sortableCols as col}
@@ -153,7 +149,7 @@
 								tabindex="0"
 								onclick={() => goto(`/authors/${author.id}`)}
 								onkeydown={(e) => handleRowKeydown(e, author.id)}
-								aria-label={`View author ${author.canonical_name}`}
+								aria-label={m.authors_view({ name: author.canonical_name })}
 							>
 								<td class="px-4 py-3 text-sm font-medium text-indigo-600">{author.canonical_name}</td>
 								<td class="px-4 py-3 text-sm text-gray-700">{author.affiliation || '—'}</td>
@@ -162,7 +158,7 @@
 								<td class="px-4 py-3 text-sm text-gray-700">{author.openalex_citations ?? '—'}</td>
 								<td class="px-4 py-3">
 									<span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full {author.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}">
-										{author.is_active ? 'Active' : 'Inactive'}
+										{author.is_active ? m.authors_active() : m.authors_inactive()}
 									</span>
 								</td>
 							</tr>
@@ -175,14 +171,14 @@
 			<button
 				onclick={() => { offset = Math.max(0, offset - limit); fetchAuthors(); }}
 				disabled={offset === 0}
-				class="px-4 py-2 text-sm border border-gray-300 rounded-md disabled:opacity-40 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-			>Previous</button>
-			<span class="text-sm text-gray-600">Page {Math.floor(offset / limit) + 1} of {Math.ceil(total / limit) || 1}</span>
+				class="btn-secondary"
+			>{m.common_previous()}</button>
+			<span class="text-sm text-gray-600">{m.common_page_of({ page: Math.floor(offset / limit) + 1, total: Math.ceil(total / limit) || 1 })}</span>
 			<button
 				onclick={() => { offset = offset + limit; fetchAuthors(); }}
 				disabled={offset + limit >= total}
-				class="px-4 py-2 text-sm border border-gray-300 rounded-md disabled:opacity-40 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-			>Next</button>
+				class="btn-secondary"
+			>{m.common_next()}</button>
 		</div>
 	{/if}
 </div>
