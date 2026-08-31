@@ -656,10 +656,15 @@
 				<p class="mt-1">{m.validation_maintenance_help()}</p>
 			</div>
 		{/if}
-		{#if workflow.auto_source_bound_eligible_occurrences > 0}
-			<p class="mb-3 text-sm text-gray-600">
-				{m.validation_automatic_summary({ accepted: workflow.auto_source_bound_accepted_occurrences, audit: workflow.auto_source_bound_audit_occurrences })}
-			</p>
+		{#if workflow.auto_source_bound_eligible_occurrences > 0 || workflow.auto_scholar_eligible_occurrences > 0}
+			<div class="mb-3 space-y-1 text-sm text-gray-600">
+				{#if workflow.auto_source_bound_eligible_occurrences > 0}
+					<p>{m.validation_automatic_summary({ accepted: workflow.auto_source_bound_accepted_occurrences, audit: workflow.auto_source_bound_audit_occurrences })}</p>
+				{/if}
+				{#if workflow.auto_scholar_eligible_occurrences > 0}
+					<p>{m.validation_scholar_automatic_summary({ accepted: workflow.auto_scholar_accepted_occurrences })}</p>
+				{/if}
+			</div>
 		{/if}
 		<nav class="grid overflow-hidden rounded-lg border border-gray-200 bg-white md:grid-cols-3 md:divide-x md:divide-gray-200" aria-label={m.validation_progress()}>
 			{#each workflow.phases as phase}

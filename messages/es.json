@@ -914,6 +914,7 @@
 	"validation_confirm_candidate_occurrence": "Confirmar a {name} en esta publicación",
 	"validation_pending_decisions": "{count} decisiones pendientes",
 	"validation_automatic_summary": "OpenAlex resolvió {accepted} apariciones verificables; {audit} quedaron como control humano.",
+	"validation_scholar_automatic_summary": "Scholar resolvió automáticamente {accepted} apariciones con todas las señales deterministas concordantes.",
 	"validation_occurrence_scope": "Decisión para esta publicación",
 	"validation_publication_evaluated": "Publicación que estás evaluando",
 	"validation_publication_evaluated_help": "La decisión sólo se aplicará a esta firma en esta publicación.",

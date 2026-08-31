@@ -720,6 +720,8 @@ export interface ValidationWorkflow {
 	auto_source_bound_eligible_occurrences: number;
 	auto_source_bound_accepted_occurrences: number;
 	auto_source_bound_audit_occurrences: number;
+	auto_scholar_eligible_occurrences: number;
+	auto_scholar_accepted_occurrences: number;
 	source_rejected_occurrences: number;
 	external_sample_reviewed: number;
 	external_sample_false_negatives: number;

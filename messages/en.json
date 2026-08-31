@@ -914,6 +914,7 @@
 	"validation_confirm_candidate_occurrence": "Confirm {name} for this publication",
 	"validation_pending_decisions": "{count} pending decisions",
 	"validation_automatic_summary": "OpenAlex resolved {accepted} verifiable occurrences; {audit} were retained for human control.",
+	"validation_scholar_automatic_summary": "Scholar automatically resolved {accepted} occurrences whose deterministic signals all agreed.",
 	"validation_occurrence_scope": "Decision for this publication",
 	"validation_publication_evaluated": "Publication you are evaluating",
 	"validation_publication_evaluated_help": "The decision will apply only to this signature in this publication.",
