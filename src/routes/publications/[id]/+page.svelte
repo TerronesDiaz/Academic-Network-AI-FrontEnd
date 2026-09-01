@@ -161,10 +161,8 @@
 				<table class="data-table" aria-label={m.publication_authors_list()}>
 					<thead class="bg-gray-50">
 						<tr>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">#</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.authors_name()}</th>
 							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.publication_position()}</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.publication_profile_owner()}</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.authors_name()}</th>
 							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.publication_signature()}</th>
 							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase" scope="col">{m.publication_resolution()}</th>
 						</tr>
@@ -181,9 +179,9 @@
 										{a.canonical_name || '—'}
 									{/if}
 								</th>
-								<td class="px-4 py-3 text-sm text-gray-600">{a.author_position ?? '—'}</td>
-								<td class="px-4 py-3 text-sm text-gray-700">{a.is_profile_owner ? m.common_yes() : m.common_no()}</td>
-								<td class="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{a.observed_signature || '—'}</td>
+								<td class="px-4 py-3 text-sm text-gray-600 max-w-md">
+									{a.observed_signatures.join(' · ') || '—'}
+								</td>
 								<td class="px-4 py-3 text-xs">
 									{#if a.resolution_method && a.resolution_method !== 'unresolved'}
 										<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded {a.resolution_status === 'heuristic_match' ? 'bg-green-100 text-green-700' : a.resolution_status === 'ambiguous' ? 'bg-amber-100 text-amber-700' : a.resolution_status === 'external' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}" title={m.publication_resolution_title({ method: a.resolution_method, model: a.resolution_model || '—', confidence: a.resolution_confidence || '—' })}>

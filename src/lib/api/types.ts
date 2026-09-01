@@ -215,8 +215,11 @@ export interface PublicationAuthor {
 	author_id: number | null;
 	canonical_name: string | null;
 	observed_signature: string | null;
+	observed_signatures: string[];
 	author_position: number | null;
 	is_profile_owner: boolean;
+	technical_row_count: number;
+	affiliations: string[];
 	resolution_status?: string | null;
 	resolution_method?: string | null;
 	resolution_model?: string | null;
