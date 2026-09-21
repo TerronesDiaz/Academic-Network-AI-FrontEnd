@@ -899,7 +899,7 @@
 						<h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">{m.pilot_publication_context_label()}</h3>
 						{#if current.evidence.publication}
 							<p class="mt-3 text-lg font-semibold leading-snug text-gray-950">{current.evidence.publication.title}</p>
-							<p class="mt-2 text-sm text-gray-600">{current.evidence.publication.year ?? m.gold_unknown_year()} · {current.evidence.publication.venue ?? m.gold_source_unavailable()}</p>
+							<p class="mt-2 text-sm text-gray-600">{current.evidence.publication.year ?? m.gold_unknown_year()} · {current.evidence.publication.venue ?? m.gold_source_unavailable()}{#if current.publication_doi} · <a href={`https://doi.org/${current.publication_doi}`} target="_blank" rel="noreferrer" class="font-mono text-xs text-indigo-700 hover:underline">{current.publication_doi}</a>{/if}{#if current.scholar_url} · <a href={current.scholar_url} target="_blank" rel="noreferrer" class="text-xs font-medium text-indigo-700 hover:underline">Scholar</a>{/if}</p>
 							{@const bylineNames = publicationBylineNames()}
 							<div class="mt-5">
 								<p class="text-sm font-medium text-gray-900">{m.pilot_publication_byline()}</p>
@@ -979,7 +979,7 @@
 						<h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">{m.pilot_publication_context_label()}</h3>
 						{#if current.evidence.publication}
 							<p class="mt-3 text-lg font-semibold leading-snug text-gray-950">{current.evidence.publication.title}</p>
-							<p class="mt-2 text-sm text-gray-600">{current.evidence.publication.year ?? m.gold_unknown_year()} · {current.evidence.publication.venue ?? m.gold_source_unavailable()}</p>
+							<p class="mt-2 text-sm text-gray-600">{current.evidence.publication.year ?? m.gold_unknown_year()} · {current.evidence.publication.venue ?? m.gold_source_unavailable()}{#if current.publication_doi} · <a href={`https://doi.org/${current.publication_doi}`} target="_blank" rel="noreferrer" class="font-mono text-xs text-indigo-700 hover:underline">{current.publication_doi}</a>{/if}{#if current.scholar_url} · <a href={current.scholar_url} target="_blank" rel="noreferrer" class="text-xs font-medium text-indigo-700 hover:underline">Scholar</a>{/if}</p>
 							{@const bylineNames = publicationBylineNames()}
 							<div class="mt-5">
 								<p class="text-sm font-medium text-gray-900">{m.pilot_publication_byline()}</p>

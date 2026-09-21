@@ -110,6 +110,16 @@
 					<dt class="text-sm text-gray-500">{m.publication_external_id()}</dt>
 					<dd class="text-sm font-medium text-gray-900 break-all">{pub.external_id || '—'}</dd>
 				</div>
+				<div>
+					<dt class="text-sm text-gray-500">Google Scholar</dt>
+					<dd class="text-sm font-medium">
+						{#if pub.scholar_url}
+							<a href={pub.scholar_url} target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded" aria-label="Google Scholar ({m.common_opens_new_tab()})">Ver en Scholar</a>
+						{:else}
+							—
+						{/if}
+					</dd>
+				</div>
 			</dl>
 			{#if pub.sources.length > 0}
 				<div class="mt-4 pt-3 border-t border-gray-100">

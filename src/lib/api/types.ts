@@ -204,6 +204,7 @@ export interface PublicationItem {
 	citations_count: number;
 	openalex_citations: number | null;
 	scholar_citations: number | null;
+	scholar_url?: string | null;
 	enriched_at: string | null;
 }
 
@@ -1272,6 +1273,8 @@ export interface BenchmarkPilotCase {
 		};
 	};
 	snapshot_hash: string;
+	publication_doi?: string | null;
+	scholar_url?: string | null;
 	label: BenchmarkPilotLabel | null;
 }
 
