@@ -6,7 +6,6 @@
 	import { browser } from '$app/environment';
 	import { logout as apiLogout } from '$lib/api/client';
 	import { onMount } from 'svelte';
-	import { restoreCookieSession } from '$lib/api/client';
 	import LanguageSelector from '$lib/components/LanguageSelector.svelte';
 	import * as m from '$lib/paraglide/messages.js';
 
@@ -16,8 +15,7 @@
 	let menuOpen = $state(false);
 	let menuBtn = $state<HTMLButtonElement | undefined>(undefined);
 
-	onMount(async () => {
-		if (!$auth) await restoreCookieSession();
+	onMount(() => {
 		sessionReady = true;
 	});
 

@@ -80,12 +80,12 @@
 		['disambiguate', m.project_step_disambiguate()],
 		['repair_integrity', m.project_step_integrity()], ['build_review_evidence', m.project_step_evidence()],
 		['expert_review', m.nav_validation()], ['quality_check', m.project_step_quality()],
-		['indicators', m.nav_indicators()], ['snapshot', m.project_step_snapshot()]
+		['indicators', m.nav_indicators()], ['altmetrics', m.project_step_altmetrics()], ['snapshot', m.project_step_snapshot()]
 	];
 	const workflowStepKeys = steps.slice(1).map((item) => item[0]);
 	const statusLabels: Record<string, string> = {
 		pending: m.status_pending(), queued: m.status_queued(), running: m.status_running(),
-		complete: m.status_complete(), failed: m.status_failed()
+		complete: m.status_complete(), failed: m.status_failed(), skipped: m.project_altmetrics_skipped()
 	};
 	const projectStatusLabels: Record<string, string> = {
 		draft: m.project_status_draft(), connecting_scholar: m.project_status_connecting_scholar(),
@@ -95,7 +95,7 @@
 	};
 	let workflowPercent = $derived.by(() => {
 		if (!workflow) return 0;
-		const completed = workflowStepKeys.filter((key) => stepStatus(key) === 'complete').length;
+		const completed = workflowStepKeys.filter((key) => ['complete', 'skipped'].includes(stepStatus(key))).length;
 		return completed / workflowStepKeys.length;
 	});
 
@@ -301,7 +301,9 @@
 	function stepStatus(key: string) {
 		if (key === 'institution_confirmed') return project?.institution.verification_status === 'verified' ? 'complete' : project?.status === 'importing_sources' ? 'running' : 'pending';
 		if (key === 'expert_review') return workflow?.status === 'awaiting_review' ? 'running' : workflow?.status === 'complete' ? 'complete' : 'pending';
-		return workflow?.steps.find((step) => step.key === key)?.status ?? 'pending';
+		const step = workflow?.steps.find((step) => step.key === key);
+		if (key === 'altmetrics' && step?.status === 'complete' && step.output?.status === 'SKIPPED') return 'skipped';
+		return step?.status ?? 'pending';
 	}
 	function currentStepProgress() {
 		const step = workflow?.steps.find((item) => item.key === workflow?.current_step);

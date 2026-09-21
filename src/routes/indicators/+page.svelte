@@ -132,7 +132,7 @@
 </script>
 
 <div class="app-page">
-	<header class="page-header"><h1 class="page-heading">{m.indicators_title()}</h1></header>
+	<header class="page-header"><h1 class="page-heading">{m.indicators_title()}</h1><a href="/indicators/altmetrics" class="text-blue-600 underline">Altmétricos por publicación</a></header>
 		<div class="tabs" role="tablist" aria-label={m.indicators_views()}>
 			<button
 				role="tab"

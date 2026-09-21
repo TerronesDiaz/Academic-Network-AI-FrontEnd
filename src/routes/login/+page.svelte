@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { login, oidcLoginUrl } from '$lib/api/client';
+	import { login } from '$lib/api/client';
 	import { auth } from '$lib/auth';
 	import * as m from '$lib/paraglide/messages.js';
 	import { userError } from '$lib/i18n/errors';
@@ -31,8 +31,6 @@
 			<p class="page-kicker">Academic Network</p>
 			<h1 class="page-heading">{m.login_subtitle()}</h1>
 		</header>
-		<a href={oidcLoginUrl()} class="btn-primary w-full">{m.login_oidc()}</a>
-		<div class="my-5 flex items-center gap-3 text-xs text-gray-400"><span class="h-px flex-1 bg-gray-200"></span>{m.login_local_divider()}<span class="h-px flex-1 bg-gray-200"></span></div>
 		<form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} aria-label={m.login_form_label()}>
 			{#if error}
 				<div role="alert" class="notice-error mb-4">{error}</div>

@@ -59,6 +59,22 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+export type AttentionInput = { version: string; publications: {
+	publication_id: string; doi: string | null; pmid: string | null; review_reference: string;
+}[] };
+export type AttentionJob = { run_id: string; status: string };
+export type AttentionResult = AttentionJob & { report: null | {
+	status_counts: Record<string, number>;
+	publications: Record<string, { attention: { status: string; score: number | null;
+		posts: number | null; accounts: number | null; readers: [string, number][];
+		channels: [string, number][] }; dimensions_bridge: string }>;
+} };
+export const listAttentionRuns = () => request<{configured: boolean; runs: AttentionJob[]}>('/indicators/altmetrics');
+export const startAttentionRun = (input: AttentionInput) => request<AttentionJob>('/indicators/altmetrics', {
+	method: 'POST', body: JSON.stringify(input)
+});
+export const getAttentionRun = (id: string) => request<AttentionResult>(`/indicators/altmetrics/${encodeURIComponent(id)}`);
+
 export function productApiBase(): string {
 	return API_BASE;
 }
@@ -144,18 +160,17 @@ async function request<T>(
 
 async function refreshToken(): Promise<boolean> {
 	const refresh = browser ? localStorage.getItem('refresh_token') : null;
+	if (!refresh) return false;
 
 	try {
 		const res = await fetch(`${API_BASE}/auth/refresh`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(refresh ? { refresh_token: refresh } : {}),
-			credentials: 'include'
+			body: JSON.stringify({ refresh_token: refresh })
 		});
 		if (!res.ok) return false;
 		const data: TokenResponse = await res.json();
-		if (refresh) setTokens(data.access_token, data.refresh_token);
-		else auth.session();
+		setTokens(data.access_token, data.refresh_token);
 		return true;
 	} catch {
 		return false;
@@ -197,21 +212,6 @@ export async function logout(): Promise<void> {
 
 export function isAuthenticated(): boolean {
 	return !!getToken();
-}
-
-export async function restoreCookieSession(): Promise<boolean> {
-	try {
-		const response = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
-		if (!response.ok) return false;
-		auth.session();
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-export function oidcLoginUrl(): string {
-	return `${API_BASE}/auth/oidc/login`;
 }
 
 export function setActiveProject(projectId: string | null) {
