@@ -98,7 +98,8 @@
 		);
 		selectedAuthorId = savedAuthorId;
 		selectedAuthorName = savedCandidate?.canonical_name ?? '';
-		selectedAuthorCurrentAffiliation = savedCandidate?.affiliation ?? null;
+		selectedAuthorCurrentAffiliation = savedAuthorId === null ? null :
+			value?.current_directory_affiliations?.[savedAuthorId] ?? savedCandidate?.affiliation ?? null;
 		selectedExternalPerson =
 			value?.evidence.external_identity_candidates?.find(
 				(person) => person.id === value?.label?.external_person_id
@@ -133,6 +134,10 @@
 			m.pilot_directory_author_id({ id: label.canonical_author_id ?? 0 });
 	}
 
+	function currentAffiliation(author: { id: number; affiliation: string | null }) {
+		return current?.current_directory_affiliations?.[author.id] ?? author.affiliation;
+	}
+
 	function selectAuthor(author: {
 		id: number;
 		canonical_name?: string;
@@ -140,7 +145,7 @@
 	}) {
 		selectedAuthorId = author.id;
 		selectedAuthorName = author.canonical_name ?? '';
-		selectedAuthorCurrentAffiliation = author.affiliation;
+		selectedAuthorCurrentAffiliation = currentAffiliation(author);
 		notice = '';
 	}
 
@@ -929,7 +934,7 @@
 							<div class="mt-3 divide-y divide-gray-200 border-y border-gray-200">
 								{#each current.evidence.candidates as candidate}
 									<div class={current.label?.canonical_author_id === candidate.id ? 'bg-indigo-50 px-3 py-3' : 'px-3 py-3'}>
-										<div class="flex flex-wrap items-start justify-between gap-2"><div><strong class="text-gray-950">{candidate.canonical_name}</strong><p class="mt-0.5 text-sm text-gray-600">{m.pilot_current_directory_affiliation({ affiliation: candidate.affiliation ?? m.gold_no_affiliation() })}</p><p class="mt-1 text-xs text-gray-500">{m.pilot_candidate_activity({ count: candidate.publication_count, start: candidate.publication_year_min ?? '—', end: candidate.publication_year_max ?? '—' })}</p></div>{#if current.label?.canonical_author_id === candidate.id}<span class="text-xs font-semibold text-indigo-700">{m.pilot_selected_candidate()}</span>{/if}</div>
+										<div class="flex flex-wrap items-start justify-between gap-2"><div><strong class="text-gray-950">{candidate.canonical_name}</strong><p class="mt-0.5 text-sm text-gray-600">{m.pilot_current_directory_affiliation({ affiliation: currentAffiliation(candidate) ?? m.gold_no_affiliation() })}</p><p class="mt-1 text-xs text-gray-500">{m.pilot_candidate_activity({ count: candidate.publication_count, start: candidate.publication_year_min ?? '—', end: candidate.publication_year_max ?? '—' })}</p></div>{#if current.label?.canonical_author_id === candidate.id}<span class="text-xs font-semibold text-indigo-700">{m.pilot_selected_candidate()}</span>{/if}</div>
 										{#if candidate.topics.length || candidate.frequent_coauthors.length || candidate.representative_publications.length}<details class="mt-2"><summary class="cursor-pointer text-xs font-medium text-indigo-700">{m.pilot_candidate_details()}</summary><div class="mt-2 space-y-2 text-xs text-gray-700">{#if candidate.topics.length}<p><strong>{m.pilot_topics()}:</strong> {candidate.topics.slice(0, 5).map((topic) => topic.name).join(' · ')}</p>{/if}{#if candidate.frequent_coauthors.length}<p><strong>{m.pilot_coauthors()}:</strong> {candidate.frequent_coauthors.slice(0, 6).map((item) => item.name).join(' · ')}</p>{/if}{#if candidate.representative_publications.length}<ul class="space-y-1">{#each candidate.representative_publications.slice(0, 3) as publication}<li>• {String(publication.title ?? publication.name ?? '')}</li>{/each}</ul>{/if}</div></details>{/if}
 									</div>
 								{/each}
@@ -1046,7 +1051,7 @@
 											<input type="radio" name="pilot-author" value={candidate.id} checked={selectedAuthorId === candidate.id} disabled={working} onchange={() => selectAuthor(candidate)} class="mt-1 h-4 w-4 shrink-0 accent-indigo-700" />
 											<span class="min-w-0 flex-1">
 												<span class="flex flex-wrap items-baseline justify-between gap-2"><strong class="text-gray-950">{candidate.canonical_name}</strong><span class="font-mono text-xs text-gray-400">{index + 1}</span></span>
-												<span class="mt-0.5 block text-sm text-gray-600">{m.pilot_current_directory_affiliation({ affiliation: candidate.affiliation ?? m.gold_no_affiliation() })}</span>
+												<span class="mt-0.5 block text-sm text-gray-600">{m.pilot_current_directory_affiliation({ affiliation: currentAffiliation(candidate) ?? m.gold_no_affiliation() })}</span>
 												<span class="mt-2 block text-sm text-gray-700">{m.pilot_candidate_activity({ count: candidate.publication_count, start: candidate.publication_year_min ?? '—', end: candidate.publication_year_max ?? '—' })}</span>
 												{#if candidate.topics.length}<span class="mt-1 block text-sm text-gray-600">{m.pilot_topics()}: {candidate.topics.slice(0, 2).map((topic) => topic.name).join(' · ')}</span>{/if}
 											</span>
@@ -1177,17 +1182,20 @@
 							{:else if benchmarkRun.state === 'failed'}
 								<p class="mt-4 border-l-2 border-red-600 pl-3 text-sm text-red-800">{benchmarkRun.error}</p>
 							{:else if benchmarkRun.results}
+								{@const hasDirectoryMetrics = Object.values(benchmarkRun.results.models).some(result => result.suites?.directory_identity?.identity_accuracy !== undefined)}
 								<div class="mt-5 flex flex-wrap gap-x-10 gap-y-3 border-y border-gray-200 py-4">
 									<div><p class="text-xs font-medium uppercase tracking-wide text-gray-500">{m.pilot_benchmark_total_cost()}</p><p class="mt-1 text-xl font-semibold tabular-nums text-gray-950">${(benchmarkTotalCost(benchmarkRun) ?? 0).toFixed(6)} USD</p><p class="mt-1 text-xs text-gray-500">{m.pilot_benchmark_total_cost_help()}</p></div>
 									{#if benchmarkDuration(benchmarkRun)}<div><p class="text-xs font-medium uppercase tracking-wide text-gray-500">{m.pilot_benchmark_duration_label()}</p><p class="mt-1 text-xl font-semibold tabular-nums text-gray-950">{benchmarkDuration(benchmarkRun)}</p></div>{/if}
 								</div>
 								<h4 class="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">{m.pilot_benchmark_results()}</h4>
+								{#if hasDirectoryMetrics}<p class="mt-2 text-xs leading-relaxed text-gray-600">{m.pilot_benchmark_accuracy_help()}</p>{/if}
 								<div class="mt-3 overflow-x-auto border-y border-gray-200">
 									<table class="min-w-full text-left text-sm">
-										<thead class="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600"><tr><th class="px-3 py-2.5">{m.pilot_benchmark_model()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_accuracy()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_correct()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_invalid()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_latency()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_reference_cost()}</th></tr></thead>
+										<thead class="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600"><tr><th class="px-3 py-2.5">{m.pilot_benchmark_model()}</th>{#if hasDirectoryMetrics}<th class="px-3 py-2.5 text-right">{m.pilot_benchmark_identity_accuracy()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_affiliation_accuracy()}</th>{/if}<th class="px-3 py-2.5 text-right">{hasDirectoryMetrics ? m.pilot_benchmark_joint_accuracy() : m.pilot_benchmark_accuracy()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_correct()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_invalid()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_latency()}</th><th class="px-3 py-2.5 text-right">{m.pilot_benchmark_reference_cost()}</th></tr></thead>
 										<tbody class="divide-y divide-gray-200">
 											{#each Object.entries(benchmarkRun.results.models) as [modelId, result]}
-											<tr><th class="whitespace-nowrap px-3 py-3 font-semibold text-gray-950">{modelId}</th><td class="px-3 py-3 text-right font-semibold">{(result.exact_accuracy * 100).toFixed(1)}%</td><td class="px-3 py-3 text-right">{result.correct}/{result.cases}</td><td class="px-3 py-3 text-right">{result.invalid_or_error}</td><td class="px-3 py-3 text-right">{Math.round(result.latency_ms.p50)} ms</td><td class="px-3 py-3 text-right">${result.cost_usd.toFixed(4)}</td></tr>
+											{@const directory = result.suites?.directory_identity}
+											<tr><th class="whitespace-nowrap px-3 py-3 font-semibold text-gray-950">{modelId}</th>{#if hasDirectoryMetrics}<td class="px-3 py-3 text-right">{directory?.identity_accuracy === undefined ? '—' : `${(directory.identity_accuracy * 100).toFixed(1)}%`}</td><td class="px-3 py-3 text-right">{directory?.affiliation_accuracy === undefined ? '—' : `${(directory.affiliation_accuracy * 100).toFixed(1)}%`}</td>{/if}<td class="px-3 py-3 text-right font-semibold">{(result.exact_accuracy * 100).toFixed(1)}%</td><td class="px-3 py-3 text-right">{result.correct}/{result.cases}</td><td class="px-3 py-3 text-right">{result.invalid_or_error}</td><td class="px-3 py-3 text-right">{Math.round(result.latency_ms.p50)} ms</td><td class="px-3 py-3 text-right">${result.cost_usd.toFixed(4)}</td></tr>
 											{/each}
 										</tbody>
 									</table>

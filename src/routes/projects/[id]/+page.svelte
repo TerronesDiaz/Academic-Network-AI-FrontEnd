@@ -6,6 +6,7 @@
 		createScholarPairing,
 		getProductProject,
 		getProductQuality,
+		intakeProjectPublications,
 		productApiBase,
 		publishProductSnapshot,
 		searchInstitutions,
@@ -28,6 +29,10 @@
 	let error = $state('');
 	let notice = $state('');
 	let useLlm = $state(false);
+	let maxLlmBudget = $state<number | undefined>(undefined);
+	let workflowSettingsInitialized = $state(false);
+	let workflowSettingsProjectId = $state('');
+	let publicationDois = $state('');
 	let publicSlug = $state('');
 	let visibility = $state<'private' | 'unlisted' | 'public'>('private');
 	let scholarValue = $state('');
@@ -42,7 +47,23 @@
 	let identifying = $state(false);
 
 	let projectId = $derived($page.params.id ?? '');
-	let workflow = $derived(project?.latest_workflow ?? null);
+	let workflow = $derived(project?.latest_workflow && project.latest_workflow.dataset_version_id === String(project.active_dataset?.id ?? '') ? project.latest_workflow : null);
+	let validLlmBudget = $derived(!useLlm || (typeof maxLlmBudget === 'number' && Number.isFinite(maxLlmBudget) && maxLlmBudget > 0));
+	let workflowActive = $derived(['queued', 'running'].includes(workflow?.status ?? ''));
+	let workflowOwnsInputs = $derived(['queued', 'running', 'awaiting_review', 'awaiting_evidence'].includes(workflow?.status ?? ''));
+	let pendingEvidenceCount = $derived.by(() => {
+		const evidenceStep = workflow?.steps.find((step) => step.key === workflow.current_step);
+		const reviewOutput = workflow?.steps.find((step) => step.key === 'build_review_evidence')?.output;
+		const identityOutput = workflow?.steps.find((step) => step.key === 'disambiguate')?.output;
+		const output = evidenceStep?.output && (evidenceStep.output.pending_evidence_occurrences !== undefined || evidenceStep.output.pending_evidence !== undefined) ? evidenceStep.output : reviewOutput?.pending_evidence_occurrences !== undefined ? reviewOutput : identityOutput ?? evidenceStep?.output;
+		const pending = output?.pending_evidence_occurrences ?? output?.pending_evidence;
+		return Array.isArray(pending) ? pending.length : typeof pending === 'number' ? Math.max(0, pending) : 0;
+	});
+	let awaitingEvidence = $derived(workflow?.status === 'awaiting_evidence' || pendingEvidenceCount > 0);
+	let modelBudget = $derived.by(() => {
+		const value = workflow?.steps.find((step) => step.key === 'disambiguate')?.output?.model_budget;
+		return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+	});
 	let sourceStatus = $derived(project?.source_status ?? null);
 	let scholarImport = $derived(sourceStatus?.primary ?? null);
 	let openAlexImport = $derived(sourceStatus?.supplemental ?? null);
@@ -75,8 +96,10 @@
 		`https://scholar.google.com/citations?view_op=search_authors&mauthors=${encodeURIComponent(project?.institution.name ?? '')}`
 	);
 	const steps = [
-		['institution_confirmed', m.project_step_institution()], ['canonicalize', m.project_step_canonicalize()],
+		['institution_confirmed', m.project_step_institution()], ['acquire_publications', m.project_step_acquire_publications()],
+		['canonicalize', m.project_step_canonicalize()],
 		['enrich_sources', m.project_step_sources()], ['refresh_catalog', m.project_step_catalog()],
+		['background_profiles', m.project_step_background_profiles()],
 		['disambiguate', m.project_step_disambiguate()],
 		['repair_integrity', m.project_step_integrity()], ['build_review_evidence', m.project_step_evidence()],
 		['expert_review', m.nav_validation()], ['quality_check', m.project_step_quality()],
@@ -85,6 +108,7 @@
 	const workflowStepKeys = steps.slice(1).map((item) => item[0]);
 	const statusLabels: Record<string, string> = {
 		pending: m.status_pending(), queued: m.status_queued(), running: m.status_running(),
+		awaiting_evidence: m.project_evidence_pending_short(), awaiting_review: m.project_review_pending(),
 		complete: m.status_complete(), failed: m.status_failed(), skipped: m.project_altmetrics_skipped()
 	};
 	const projectStatusLabels: Record<string, string> = {
@@ -159,6 +183,18 @@
 	async function refresh(silent = false) {
 		try {
 			project = await getProductProject(projectId);
+			if (!workflowSettingsInitialized || workflowSettingsProjectId !== projectId) {
+				useLlm = false;
+				maxLlmBudget = undefined;
+				const saved = project.latest_workflow;
+				const previousBudget = saved?.steps.find((step) => step.key === 'disambiguate')?.output?.model_budget;
+				const maximum = saved?.max_llm_budget_usd ?? (previousBudget && typeof previousBudget === 'object' ? (previousBudget as Record<string, unknown>).maximum_usd : null);
+				if (typeof maximum === 'number' && maximum > 0) maxLlmBudget = maximum;
+				if (typeof saved?.use_llm === 'boolean') useLlm = saved.use_llm;
+				else if (typeof maximum === 'number' && maximum > 0) useLlm = true;
+				workflowSettingsInitialized = true;
+				workflowSettingsProjectId = projectId;
+			}
 			if (['ready_to_publish', 'published'].includes(project.status)) quality = await getProductQuality(projectId);
 		} catch (value) {
 			if (!silent) error = message(value);
@@ -256,9 +292,10 @@
 	}
 
 	async function start(mode: 'retry' | 'restart' = 'restart') {
+		if (!validLlmBudget) { error = m.project_llm_budget_required(); return; }
 		busy = true; error = '';
 		try {
-			await startProductWorkflow(projectId, { use_llm: useLlm, mode });
+			await startProductWorkflow(projectId, { use_llm: useLlm, max_llm_budget_usd: useLlm ? maxLlmBudget : null, mode });
 			notice = mode === 'retry' ? m.project_retrying_stage() : m.project_restarted();
 			await refresh();
 		}
@@ -267,10 +304,12 @@
 	}
 
 	async function refreshCatalogAndReanalyze() {
+		if (!validLlmBudget) { error = m.project_llm_budget_required(); return; }
 		busy = true; error = '';
 		try {
 			await startProductWorkflow(projectId, {
-				use_llm: false,
+				use_llm: useLlm,
+				max_llm_budget_usd: useLlm ? maxLlmBudget : null,
 				mode: 'restart',
 				start_from: 'refresh_catalog'
 			});
@@ -282,9 +321,25 @@
 	}
 
 	async function finishReview() {
+		if (awaitingEvidence) { error = m.project_evidence_close_blocked(); return; }
 		busy = true; error = '';
 		try { await completeProductReview(projectId); notice = m.project_review_closed(); await refresh(); }
 		catch (value) { error = message(value); }
+		finally { busy = false; }
+	}
+
+	async function addPublications() {
+		const dois = [...new Set(publicationDois.split(/\r?\n/).map((value) => value.trim().replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').toLowerCase()).filter(Boolean))];
+		if (!dois.length) { error = m.project_doi_required(); return; }
+		const invalid = dois.find((doi) => !/^10\.\d{4,9}\/\S+$/.test(doi));
+		if (invalid) { error = m.project_doi_invalid({ doi: invalid }); return; }
+		busy = true; error = ''; notice = '';
+		try {
+			await intakeProjectPublications(projectId, dois);
+			publicationDois = '';
+			notice = m.project_doi_added({ count: dois.length });
+			await refresh();
+		} catch (value) { error = message(value); }
 		finally { busy = false; }
 	}
 
@@ -300,10 +355,14 @@
 
 	function stepStatus(key: string) {
 		if (key === 'institution_confirmed') return project?.institution.verification_status === 'verified' ? 'complete' : project?.status === 'importing_sources' ? 'running' : 'pending';
-		if (key === 'expert_review') return workflow?.status === 'awaiting_review' ? 'running' : workflow?.status === 'complete' ? 'complete' : 'pending';
+		if (key === 'expert_review') return workflow?.status === 'awaiting_review' && workflow?.current_step !== 'directory_review' ? 'running' : workflow?.status === 'complete' || ['quality_check', 'indicators', 'altmetrics', 'snapshot'].includes(workflow?.current_step ?? '') ? 'complete' : 'pending';
 		const step = workflow?.steps.find((step) => step.key === key);
 		if (key === 'altmetrics' && step?.status === 'complete' && step.output?.status === 'SKIPPED') return 'skipped';
 		return step?.status ?? 'pending';
+	}
+	function stepLabel(key: string | null | undefined) {
+		if (key === 'directory_review') return m.duplicates_title();
+		return steps.find((item) => item[0] === key)?.[1] ?? key ?? m.project_preparing();
 	}
 	function currentStepProgress() {
 		const step = workflow?.steps.find((item) => item.key === workflow?.current_step);
@@ -356,7 +415,7 @@
 			</div>
 			{#if openAlexImport?.status === 'failed'}<button onclick={bootstrap} disabled={busy} class="mt-4 rounded-lg bg-red-800 px-5 py-2.5 text-white">{m.project_retry_openalex()}</button>{/if}
 		</section>
-	{:else if project.status === 'draft' && project.institution.openalex_id}
+	{:else if project.status === 'draft' && project.institution.openalex_id && sourceStatus?.composite_state !== 'ready'}
 		<section class="surface p-6">
 			<h2 class="text-xl font-semibold">{m.project_start_scholar()}</h2>
 			<p class="mt-2 text-gray-600">{m.project_start_scholar_help()}</p>
@@ -366,15 +425,38 @@
 		<section class="surface p-6">
 			<h2 class="text-xl font-semibold">{m.project_data_ready()}</h2>
 			<p class="mt-2 text-gray-600">{m.project_data_summary({ authors: scholarImport ? formatNumber(scholarImport.imported_authors) : '—', works: scholarImport ? formatNumber(scholarImport.imported_works) : '—', profiles: formatNumber(sourceStatus?.reconciliation.openalex_profiles_matched ?? 0), added: formatNumber(sourceStatus?.reconciliation.openalex_works_added ?? 0) })}</p>
-			<label class="mt-4 flex gap-2 text-sm"><input type="checkbox" bind:checked={useLlm}/> {m.project_use_llm()}</label>
-			<button onclick={() => start('restart')} disabled={busy} class="mt-4 rounded-lg bg-indigo-700 px-5 py-2.5 text-white">{m.project_continue_disambiguation()}</button>
+		</section>
+	{/if}
+
+	{#if project.active_dataset && sourceStatus?.composite_state === 'ready'}
+		<section class="surface p-6">
+			<h2 class="text-xl font-semibold">{m.project_publication_intake_title()}</h2>
+			<p class="mt-2 text-sm text-gray-600">{m.project_publication_intake_help()}</p>
+			<label for="publication-dois" class="mt-4 block text-sm font-medium">{m.project_doi_label()}</label>
+			<textarea id="publication-dois" bind:value={publicationDois} rows="4" disabled={busy || workflowOwnsInputs} placeholder={m.project_doi_placeholder()} class="mt-2 block w-full rounded-lg border border-gray-300 bg-white p-3 text-sm disabled:bg-gray-50"></textarea>
+			<button onclick={addPublications} disabled={busy || workflowOwnsInputs || !publicationDois.trim()} class="btn-secondary mt-3">{m.project_doi_add()}</button>
+			{#if workflowOwnsInputs}<p class="mt-2 text-xs text-gray-500">{m.project_doi_workflow_active()}</p>{/if}
+			<div class="mt-5 border-t border-gray-200 pt-4">
+				<label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={useLlm} disabled={busy || workflowActive}/> {m.project_use_llm()}</label>
+				{#if useLlm}
+					<label for="llm-budget" class="mt-4 block text-sm font-medium">{m.project_llm_budget_label()}</label>
+					<div class="mt-2 flex items-center gap-2"><span class="text-sm text-gray-500">US$</span><input id="llm-budget" type="number" min="0.01" step="0.01" required aria-required="true" bind:value={maxLlmBudget} disabled={busy || workflowActive} class="w-36 rounded-lg border border-gray-300 p-2 text-sm" /></div>
+					<p class="mt-2 max-w-3xl text-xs text-gray-500">{m.project_llm_budget_help()}</p>
+				{/if}
+				{#if modelBudget && typeof modelBudget.committed_upper_usd === 'number' && typeof modelBudget.maximum_usd === 'number'}
+					<p class="mt-3 text-sm text-gray-600">{m.project_llm_budget_used({ spent: Number(modelBudget.committed_upper_usd).toFixed(4), maximum: Number(modelBudget.maximum_usd).toFixed(2) })}</p>
+				{/if}
+				{#if !workflow || ['complete', 'cancelled'].includes(workflow.status) || project.status === 'institution_confirmed'}
+					<button onclick={() => start('restart')} disabled={busy || workflowActive || !validLlmBudget} class="btn-primary mt-4">{m.project_continue_disambiguation()}</button>
+				{/if}
+			</div>
 		</section>
 	{/if}
 
 	{#if workflow?.status === 'running'}
 		<section class="surface border-l-4 border-l-indigo-600 p-6">
 			<div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-xl font-semibold">{m.project_processing()}</h2><span class="rounded-full bg-indigo-700 px-3 py-1 text-sm text-white">{formatPercent(workflowPercent, 0)}</span></div>
-			<p class="mt-3">{m.project_current_stage({ stage: String(workflow.current_step ?? m.project_preparing()) })}</p>
+			<p class="mt-3">{m.project_current_stage({ stage: stepLabel(workflow.current_step) })}</p>
 			<div class="mt-4 h-3 overflow-hidden rounded-full bg-white"><div class="h-full bg-indigo-600 transition-all" style={`width: ${Math.max(2, workflowPercent * 100)}%`}></div></div>
 			<p class="mt-2 text-sm text-gray-600">{m.project_steps_done({ done: workflow.steps.filter((step) => step.status === 'complete').length, total: workflow.steps.length })}</p>
 			{#if currentStepProgress()}
@@ -387,15 +469,22 @@
 			{/if}
 			<p class="mt-2 text-xs text-gray-500">{m.project_processing_help()}</p>
 		</section>
+	{:else if workflow?.status === 'awaiting_evidence'}
+		<section class="surface border-l-4 border-l-amber-500 p-6" role="status">
+			<h2 class="text-xl font-semibold">{m.project_evidence_pending_title()}</h2>
+			<p class="mt-2 text-gray-700">{m.project_evidence_pending_help()}</p>
+			{#if pendingEvidenceCount > 0}<p class="mt-3 font-medium text-amber-900">{m.project_evidence_pending_count({ count: pendingEvidenceCount })}</p>{/if}
+			<button onclick={() => start('retry')} disabled={busy || !validLlmBudget} class="btn-primary mt-4">{busy ? m.project_starting() : m.project_evidence_resume()}</button>
+		</section>
 	{:else if workflow?.status === 'failed'}
 		<section class="surface border-l-4 border-l-red-600 p-6">
 			<h2 class="text-xl font-semibold text-red-900">{m.project_processing_stopped()}</h2>
-			<p class="mt-2 text-red-800">{m.project_stage({ stage: workflow.current_step ?? m.project_unknown_stage() })}</p>
+			<p class="mt-2 text-red-800">{m.project_stage({ stage: stepLabel(workflow.current_step) })}</p>
 			<p class="mt-2 break-words text-sm text-red-800">{workflow.error_message ?? m.project_server_failure()}</p>
 			<p class="mt-3 text-sm text-red-800">{m.project_retry_help()}</p>
 			<div class="mt-4 flex flex-wrap gap-3">
-				<button onclick={() => start('retry')} disabled={busy} class="rounded-lg bg-red-800 px-5 py-2.5 text-white">{busy ? m.project_starting() : m.project_retry_stage()}</button>
-				<button onclick={() => start('restart')} disabled={busy} class="rounded-lg border border-red-800 bg-white px-5 py-2.5 text-red-900">{m.project_restart()}</button>
+				<button onclick={() => start('retry')} disabled={busy || !validLlmBudget} class="rounded-lg bg-red-800 px-5 py-2.5 text-white">{busy ? m.project_starting() : m.project_retry_stage()}</button>
+				<button onclick={() => start('restart')} disabled={busy || !validLlmBudget} class="rounded-lg border border-red-800 bg-white px-5 py-2.5 text-red-900">{m.project_restart()}</button>
 			</div>
 		</section>
 	{/if}
@@ -430,9 +519,21 @@
 	{/if}
 
 	{#if workflow?.status === 'awaiting_review'}
-		<section class="surface border-l-4 border-l-amber-500 p-6"><h2 class="text-xl font-semibold">{m.project_review_pending()}</h2><p class="mt-2">{m.project_review_help()}</p><div class="mt-4 flex flex-wrap gap-3"><a href="/validation?phase=current" class="btn-primary">{m.project_continue_review()}</a><button onclick={finishReview} disabled={busy} class="btn-secondary">{m.project_close_review()}</button></div><div class="mt-5 border-t border-gray-200 pt-4"><p class="max-w-3xl text-sm text-gray-600">{m.project_catalog_refresh_help()}</p><button onclick={refreshCatalogAndReanalyze} disabled={busy} class="mt-3 text-sm font-semibold text-indigo-700 hover:underline disabled:opacity-40">{m.project_catalog_refresh_action()}</button></div></section>
+		<section class="surface border-l-4 border-l-amber-500 p-6">
+			{#if workflow.current_step === 'directory_review'}
+				<h2 class="text-xl font-semibold">{m.duplicates_title()}</h2>
+				<p class="mt-2">{m.duplicates_help()}</p>
+				<a href="/validation/duplicates" class="btn-primary mt-4">{m.project_continue_review()}</a>
+			{:else}
+				<h2 class="text-xl font-semibold">{m.project_review_pending()}</h2>
+				<p class="mt-2">{m.project_review_help()}</p>
+				{#if awaitingEvidence}<p class="mt-3 font-medium text-amber-800">{m.project_evidence_close_blocked()}</p>{/if}
+				<div class="mt-4 flex flex-wrap gap-3"><a href="/validation?phase=current" class="btn-primary">{m.project_continue_review()}</a><button onclick={finishReview} disabled={busy || awaitingEvidence} class="btn-secondary">{m.project_close_review()}</button></div>
+				<div class="mt-5 border-t border-gray-200 pt-4"><p class="max-w-3xl text-sm text-gray-600">{m.project_catalog_refresh_help()}</p><button onclick={refreshCatalogAndReanalyze} disabled={busy || !validLlmBudget} class="mt-3 text-sm font-semibold text-indigo-700 hover:underline disabled:opacity-40">{m.project_catalog_refresh_action()}</button></div>
+			{/if}
+		</section>
 	{:else if ['ready_to_publish', 'published'].includes(project.status)}
-		<section class="surface p-6"><h2 class="text-xl font-semibold">{m.project_quality_publish()}</h2>{#if quality}<div class="metric-strip mt-4">{@render Metric(m.project_roster_coverage(), formatPercent(quality.roster_coverage))}{@render Metric(m.project_work_coverage(), formatPercent(quality.work_coverage))}{@render Metric(m.project_pending(), formatNumber(quality.pending_risk_groups))}{@render Metric(m.project_exclusions(), formatNumber(quality.terminal_exclusions))}</div>{/if}<div class="mt-5 flex flex-wrap gap-3"><select bind:value={visibility} class="rounded-md border p-2"><option value="private">{m.project_private()}</option><option value="unlisted">{m.project_unlisted()}</option><option value="public">{m.project_public()}</option></select>{#if visibility !== 'private'}<input bind:value={publicSlug} class="rounded-md border p-2" placeholder="public-slug" />{/if}<button onclick={publish} disabled={busy || !quality?.passed} class="btn-primary">{m.project_publish_snapshot()}</button></div><div class="mt-5 border-t border-gray-200 pt-4"><p class="max-w-3xl text-sm text-gray-600">{m.project_catalog_refresh_help()}</p><button onclick={refreshCatalogAndReanalyze} disabled={busy} class="mt-3 text-sm font-semibold text-indigo-700 hover:underline disabled:opacity-40">{m.project_catalog_refresh_action()}</button></div></section>
+		<section class="surface p-6"><h2 class="text-xl font-semibold">{m.project_quality_publish()}</h2>{#if quality}<div class="metric-strip mt-4">{@render Metric(m.project_roster_coverage(), formatPercent(quality.roster_coverage))}{@render Metric(m.project_work_coverage(), formatPercent(quality.work_coverage))}{@render Metric(m.project_pending(), formatNumber(quality.pending_risk_groups))}{@render Metric(m.project_exclusions(), formatNumber(quality.terminal_exclusions))}</div>{/if}<div class="mt-5 flex flex-wrap gap-3"><select bind:value={visibility} class="rounded-md border p-2"><option value="private">{m.project_private()}</option><option value="unlisted">{m.project_unlisted()}</option><option value="public">{m.project_public()}</option></select>{#if visibility !== 'private'}<input bind:value={publicSlug} class="rounded-md border p-2" placeholder="public-slug" />{/if}<button onclick={publish} disabled={busy || !quality?.passed || awaitingEvidence} class="btn-primary">{m.project_publish_snapshot()}</button></div><div class="mt-5 border-t border-gray-200 pt-4"><p class="max-w-3xl text-sm text-gray-600">{m.project_catalog_refresh_help()}</p><button onclick={refreshCatalogAndReanalyze} disabled={busy || !validLlmBudget} class="mt-3 text-sm font-semibold text-indigo-700 hover:underline disabled:opacity-40">{m.project_catalog_refresh_action()}</button></div></section>
 	{/if}
 {/if}
 </div>

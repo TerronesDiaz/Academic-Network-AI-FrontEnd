@@ -640,7 +640,7 @@
 			</div>
 			<div class="flex flex-wrap gap-3 text-sm">
 				<a href="/validation/gold" class="font-medium text-amber-700 hover:underline">{m.validation_gold()}</a>
-				<a href="/validation/abstentions" class="font-medium text-amber-700 hover:underline">
+				<a href={workflow?.pending_evidence_occurrences ? '/validation/data-gaps' : '/validation/abstentions'} class="font-medium text-amber-700 hover:underline">
 					{m.validation_data_audit({ count: workflow ? workflow.abstention_groups + workflow.data_gap_groups : 0 })}
 				</a>
 				<a href="/validation/duplicates" class="font-medium text-indigo-700 hover:underline">{m.validation_duplicates()}</a>
@@ -650,10 +650,17 @@
 	</header>
 
 	{#if workflow}
-		{#if workflow.algorithm_version.startsWith('expert-shadow-') && !workflow.decision_safe}
+		{#if !workflow.decision_safe}
 			<div role="status" class="notice-warning">
 				<p class="font-semibold">{m.validation_maintenance()}</p>
 				<p class="mt-1">{m.validation_maintenance_help()}</p>
+			</div>
+		{/if}
+		{#if workflow.pending_evidence_occurrences > 0}
+			<div role="status" class="notice-warning">
+				<p class="font-semibold">{m.validation_acquisition_pending({ count: workflow.pending_evidence_occurrences })}</p>
+				<p class="mt-1">{m.validation_acquisition_pending_help()}</p>
+				<a href="/validation/data-gaps" class="mt-2 inline-block font-medium underline">{m.validation_acquisition_view()}</a>
 			</div>
 		{/if}
 		{#if workflow.auto_source_bound_eligible_occurrences > 0 || workflow.auto_scholar_eligible_occurrences > 0}
@@ -692,7 +699,7 @@
 							<div class="mt-1 hidden text-[11px] text-gray-400 sm:block" title={workflow.counter_definitions.technical_row}>
 								{m.validation_technical_rows({ rows: phase.pending_technical_rows, processed: phase.accepted_occurrences + phase.system_external_occurrences })}
 							</div>
-							{#if workflow.algorithm_version.startsWith('expert-shadow-') && !workflow.decision_safe && phase.pending_groups}
+							{#if !workflow.decision_safe && phase.pending_groups}
 								<div class="mt-1 text-xs font-medium text-amber-700">{m.validation_read_only()}</div>
 							{:else if !phase.can_decide && phase.pending_groups}
 								<div class="mt-1 hidden text-xs font-medium text-gray-500 sm:block">{m.validation_preview()}</div>
@@ -925,6 +932,12 @@
 											{:else}<p class="mt-2 text-sm text-gray-500">{m.validation_no_coauthor_connection()}</p>{/if}
 										</div>
 									</div>
+									{#if candidate.evidence.candidate?.historical_papers?.length}
+										<div class="mt-4">
+											<h5 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{m.validation_related_publications()}</h5>
+											<ul class="mt-2 space-y-2">{#each candidate.evidence.candidate.historical_papers.slice(0, 5) as paper}<li class="text-sm text-gray-700">{#if paper.doi}<a href={`https://doi.org/${paper.doi.replace(/^https?:\/\/(?:dx\.)?doi\.org\//, '')}`} target="_blank" rel="noreferrer" class="font-medium text-indigo-800 hover:underline">{paper.title}</a>{:else}<span class="font-medium">{paper.title}</span>{/if}<div class="text-xs text-gray-500">{paper.publication_year ?? paper.year ?? '—'}{paper.source ? ` · ${paper.source}` : ''}</div></li>{/each}</ul>
+										</div>
+									{/if}
 
 									{#each candidate.evidence.warnings ?? [] as warning}<p class="mt-4 rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-800">{warning.message}</p>{/each}
 
@@ -1009,7 +1022,9 @@
 		<section class="empty-state px-6">
 			<h2 class="text-xl font-bold text-gray-900">{queueStatus === 'deferred' ? m.validation_no_deferred() : m.validation_up_to_date()}</h2>
 			<p class="mx-auto mt-2 max-w-lg text-sm text-gray-600">
-				{#if workflow?.complete}
+				{#if workflow?.pending_evidence_occurrences}
+					{m.validation_acquisition_pending_help()}
+				{:else if workflow?.complete}
 					{m.validation_complete_help()}
 				{:else if workflow?.current_phase && workflow.current_phase !== viewedPhase}
 					{m.validation_continue_current()}
@@ -1020,7 +1035,11 @@
 			{#if workflow?.current_phase && workflow.current_phase !== viewedPhase}
 				<button onclick={() => void choosePhase(workflow!.current_phase!)} class="mt-5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">{m.validation_go_current()}</button>
 			{:else if workflow?.complete}
-				<button onclick={refreshDerivedData} disabled={refreshing || !!lastDecision} class="mt-5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40">{refreshing ? m.validation_updating() : m.validation_update_derived()}</button>
+				{#if workflow.algorithm_version === 'product-e6-haiku-v1'}
+					<a href={workflow.project_id ? `/projects/${workflow.project_id}` : '/projects'} class="btn-primary mt-5 inline-block">{m.validation_acquisition_project()}</a>
+				{:else}
+					<button onclick={refreshDerivedData} disabled={refreshing || !!lastDecision} class="mt-5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40">{refreshing ? m.validation_updating() : m.validation_update_derived()}</button>
+				{/if}
 			{/if}
 		</section>
 		{/if}

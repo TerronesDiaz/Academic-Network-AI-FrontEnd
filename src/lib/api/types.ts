@@ -39,6 +39,8 @@ export interface ProductWorkflow {
 	error_message: string | null;
 	started_at: string;
 	finished_at: string | null;
+	use_llm?: boolean;
+	max_llm_budget_usd?: number | null;
 	steps: Array<{
 		key: string;
 		status: string;
@@ -524,6 +526,9 @@ export interface ValidationCoauthorEvidence {
 }
 
 export interface ValidationCandidateEvidence {
+	candidate?: {
+		historical_papers?: Array<{ title: string; doi?: string | null; year?: number | null; publication_year?: number | null; source?: string | null }>;
+	};
 	profile_summary_es?: string | null;
 	topics?: ValidationTopic[];
 	representative_publications?: ValidationPublication[];
@@ -704,6 +709,7 @@ export interface ValidationPhaseProgress {
 
 export interface ValidationWorkflow {
 	run_id: string;
+	project_id: string | null;
 	algorithm_version: string;
 	evidence_version: string;
 	audit_version: string | null;
@@ -717,6 +723,8 @@ export interface ValidationWorkflow {
 	data_gap_groups: number;
 	data_gap_occurrences: number;
 	data_gap_technical_rows: number;
+	pending_evidence_groups: number;
+	pending_evidence_occurrences: number;
 	stratum_counts: Record<string, Record<string, { groups: number; occurrences: number; technical_rows: number }>>;
 	counter_definitions: Record<string, string>;
 	auto_repaired_occurrences: number;
@@ -1082,6 +1090,11 @@ export interface BenchmarkRunStatus {
 			correct: number;
 			incorrect?: number;
 			exact_accuracy: number;
+			suites?: Record<string, {
+				identity_accuracy?: number;
+				affiliation_accuracy?: number;
+				classification_accuracy?: number;
+			}>;
 			invalid_or_error: number;
 			wrong_author_assignments: number;
 			requests: number;
@@ -1275,6 +1288,7 @@ export interface BenchmarkPilotCase {
 	snapshot_hash: string;
 	publication_doi?: string | null;
 	scholar_url?: string | null;
+	current_directory_affiliations?: Record<string, string>;
 	label: BenchmarkPilotLabel | null;
 }
 

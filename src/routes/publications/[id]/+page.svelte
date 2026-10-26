@@ -3,7 +3,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/auth';
-	import { getPublication } from '$lib/api/client';
+	import { getPublication, getDimensionsEvidence, acquireDimensionsEvidence, type DimensionsEvidenceResponse } from '$lib/api/client';
 	import type { PublicationDetail } from '$lib/api/types';
 	import * as m from '$lib/paraglide/messages.js';
 	import { formatDate } from '$lib/i18n/format';
@@ -13,6 +13,9 @@
 	let pub = $state<PublicationDetail | null>(null);
 	let loading = $state(true);
 	let error = $state('');
+	let dimensions = $state<DimensionsEvidenceResponse | null>(null);
+	let dimensionsBusy = $state(false);
+	let dimensionsError = $state('');
 
 	let backUrl = $state('/publications');
 	let backLabel = $state(m.common_back_to({ target: m.publications_title() }));
@@ -36,6 +39,10 @@
 		try {
 			publicationId = Number($page.params.id);
 			pub = await getPublication(publicationId);
+			dimensions = null;
+			dimensionsError = '';
+			try { dimensions = await getDimensionsEvidence(publicationId); }
+			catch (e) { dimensionsError = userError(e, m.dimensions_error()); }
 		} catch (e) {
 			error = userError(e, m.publication_load_error());
 		} finally {
@@ -50,6 +57,21 @@
 	function fmtDate(d: string | null) {
 		if (!d) return '—';
 		return formatDate(d);
+	}
+
+	function dimensionsStatus(status: string) {
+		if (status === 'matched') return m.dimensions_status_matched();
+		if (status === 'conflict') return m.dimensions_status_conflict();
+		if (status === 'transient') return m.dimensions_status_transient();
+		return m.dimensions_status_unmatched();
+	}
+
+	async function acquireDimensions() {
+		dimensionsBusy = true;
+		dimensionsError = '';
+		try { dimensions = await acquireDimensionsEvidence(publicationId, Boolean(dimensions?.evidence)); }
+		catch (e) { dimensionsError = userError(e, m.dimensions_error()); }
+		finally { dimensionsBusy = false; }
 	}
 </script>
 
@@ -128,6 +150,26 @@
 				</div>
 			{/if}
 		</article>
+
+		<section class="surface p-6 mt-6" aria-labelledby="dimensions-heading">
+			<h2 id="dimensions-heading" class="text-lg font-semibold">{m.dimensions_title()}</h2>
+			<p class="mt-2 text-sm text-gray-600">{m.dimensions_explanation()}</p>
+			{#if dimensionsError}<p role="alert" class="notice-error mt-3">{dimensionsError}</p>{/if}
+			{#if dimensions?.evidence}
+				<p class="my-3 text-sm">{m.dimensions_status({ status: dimensionsStatus(dimensions.evidence.status) })} · {fmtDate(dimensions.evidence.captured_at)}</p>
+				{#if dimensions.evidence.source_id}<p class="text-sm"><a class="text-indigo-600 hover:underline" href={`https://app.dimensions.ai/details/publication/${encodeURIComponent(dimensions.evidence.source_id)}`} target="_blank" rel="noopener noreferrer">{dimensions.evidence.source_id}</a> · {dimensions.evidence.title}</p>{/if}
+				{#if dimensions.evidence.authors.length}
+					<ol class="list-decimal pl-6 mt-3 space-y-2">
+						{#each dimensions.evidence.authors as author}
+							<li value={author.position + 1} class="text-sm"><strong>{author.name}</strong>{#if author.orcid} · ORCID {author.orcid}{/if}<p class="text-gray-600">{author.affiliations.join(' · ') || m.dimensions_no_affiliation()}</p></li>
+						{/each}
+					</ol>
+				{:else}<p class="text-sm mt-2">{m.dimensions_no_authors()}</p>{/if}
+			{:else}
+				<p class="text-sm my-3">{dimensions?.configured ? m.dimensions_empty() : m.dimensions_missing_key()}</p>
+			{/if}
+			<button class="btn-primary mt-3" onclick={acquireDimensions} disabled={!dimensions?.configured || dimensionsBusy}>{dimensionsBusy ? m.dimensions_working() : dimensions?.evidence ? m.dimensions_refresh() : m.dimensions_acquire()}</button>
+		</section>
 
 		{#if pub.external_metadata.length > 0}
 			<section class="surface p-6" aria-labelledby="ext-meta-heading">

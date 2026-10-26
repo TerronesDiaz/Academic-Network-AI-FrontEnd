@@ -323,6 +323,13 @@ export function startProductWorkflow(
 	});
 }
 
+export function intakeProjectPublications(projectId: string, dois: string[]): Promise<Record<string, unknown>> {
+	setActiveProject(projectId);
+	return request(`/v1/projects/${projectId}/publications/intake`, {
+		method: 'POST', body: JSON.stringify({ dois })
+	});
+}
+
 export function getProductWorkflow(projectId: string): Promise<ProductWorkflow> {
 	setActiveProject(projectId);
 	return request<ProductWorkflow>(`/v1/projects/${projectId}/workflow`);
@@ -535,7 +542,7 @@ export async function prepareValidationWorkflow(): Promise<ValidationPreparation
 
 export async function getNextValidationGroup(params?: {
 	phase?: ValidationPhase;
-	status?: 'pending' | 'deferred' | 'abstained' | 'accepted' | 'source_rejected';
+	status?: 'pending' | 'deferred' | 'pending_evidence' | 'abstained' | 'accepted' | 'source_rejected';
 }): Promise<ValidationGroup | null> {
 	const qs = new URLSearchParams();
 	if (params?.phase) qs.set('phase', params.phase);
@@ -1082,4 +1089,27 @@ export async function downloadBenchmarkArtifact(
 	anchor.download = artifact === 'comparison' ? 'benchmark-comparison.csv' : artifact === 'summary' ? 'benchmark-summary.json' : 'benchmark-report.md';
 	anchor.click();
 	URL.revokeObjectURL(url);
+}
+
+export interface DimensionsEvidenceResponse {
+	configured: boolean;
+	evidence: null | {
+		status: string;
+		run_id: string;
+		source_id: string | null;
+		doi: string | null;
+		title: string | null;
+		year: number | null;
+		match_method: string | null;
+		captured_at: string;
+		authors: { name: string; position: number; orcid: string | null; affiliations: string[] }[];
+	};
+}
+
+export function getDimensionsEvidence(publicationId: number) {
+	return request<DimensionsEvidenceResponse>(`/publications/${publicationId}/dimensions`);
+}
+
+export function acquireDimensionsEvidence(publicationId: number, refresh = false) {
+	return request<DimensionsEvidenceResponse>(`/publications/${publicationId}/dimensions?refresh=${refresh}`, { method: 'POST' });
 }
