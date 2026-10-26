@@ -15,14 +15,17 @@
 	let sessionReady = $state(false);
 	let menuOpen = $state(false);
 	let menuBtn = $state<HTMLButtonElement | undefined>(undefined);
+	// Experimental route has its own local-only API/session; no production session bootstrap.
+	let supervisedPilot = $derived($page.url.pathname === '/validation/gold/supervised');
 
 	onMount(async () => {
+		if (supervisedPilot) { sessionReady = true; return; }
 		if (!$auth) await restoreCookieSession();
 		sessionReady = true;
 	});
 
 	$effect(() => {
-		if (!browser || !sessionReady) return;
+		if (!browser || !sessionReady || supervisedPilot) return;
 		const pathname = $page.url.pathname;
 		if (!$auth && pathname !== '/login') {
 			void goto('/login', { replaceState: true });
@@ -60,7 +63,9 @@
 	<title>AcademicNetwork</title>
 </svelte:head>
 
-{#if !sessionReady && !loggedIn}
+{#if supervisedPilot}
+	<main class="min-h-screen bg-gray-50 text-gray-950">{@render children()}</main>
+{:else if !sessionReady && !loggedIn}
 	<div class="min-h-screen grid place-items-center bg-gray-50" role="status" aria-live="polite">
 		<p class="text-sm text-gray-500">{m.session_checking()}</p>
 	</div>
