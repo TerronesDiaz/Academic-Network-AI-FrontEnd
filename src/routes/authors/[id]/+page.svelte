@@ -151,26 +151,26 @@
 						<h3 class="text-sm font-semibold text-gray-900 mb-3">Google Scholar</h3>
 						<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 							<div class="text-center">
-								<div class="text-2xl font-bold text-blue-700">{fmtNum(author.base_citations)}</div>
+								<div class="text-2xl font-semibold tabular-nums text-gray-950">{fmtNum(author.base_citations)}</div>
 								<div class="text-xs text-gray-600">{m.author_citations()}</div>
 							</div>
 							{#if author.scholar_metrics}
 								<div class="text-center">
-									<div class="text-2xl font-bold text-blue-700">{author.scholar_metrics.h_index_all}</div>
+									<div class="text-2xl font-semibold tabular-nums text-gray-950">{author.scholar_metrics.h_index_all}</div>
 									<div class="text-xs text-gray-600">H-Index</div>
 								</div>
 								<div class="text-center">
-									<div class="text-2xl font-bold text-blue-700">{author.scholar_metrics.i10_index_all}</div>
+									<div class="text-2xl font-semibold tabular-nums text-gray-950">{author.scholar_metrics.i10_index_all}</div>
 									<div class="text-xs text-gray-600">I10-Index</div>
 								</div>
 								<div class="text-center">
-									<div class="text-2xl font-bold text-blue-700">{author.scholar_metrics.publications_count}</div>
+									<div class="text-2xl font-semibold tabular-nums text-gray-950">{author.scholar_metrics.publications_count}</div>
 									<div class="text-xs text-gray-600">{m.author_publications_count()}</div>
 								</div>
 							{/if}
 						</div>
 						{#if author.scholar_metrics}
-							<div class="mt-3 pt-3 border-t border-blue-200 grid grid-cols-2 gap-2 text-xs text-gray-600">
+							<div class="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2 text-xs text-gray-600">
 								<div>{m.author_citations_since({ count: formatNumber(author.scholar_metrics.citations_since_2021) })}</div>
 								<div>{m.author_h_since({ count: author.scholar_metrics.h_index_since_2021 })}</div>
 								<div>{m.author_i10_since({ count: author.scholar_metrics.i10_index_since_2021 })}</div>
@@ -183,19 +183,19 @@
 						{#if author.openalex_metrics && author.openalex_metrics.publications_count > 0}
 							<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 								<div class="text-center">
-									<div class="text-2xl font-bold text-emerald-700">{fmtNum(author.openalex_metrics.total_citations)}</div>
+									<div class="text-2xl font-semibold tabular-nums text-gray-950">{fmtNum(author.openalex_metrics.total_citations)}</div>
 									<div class="text-xs text-gray-600">{m.author_citations()}</div>
 								</div>
 								<div class="text-center">
-									<div class="text-2xl font-bold text-emerald-700">{author.openalex_metrics.h_index}</div>
+									<div class="text-2xl font-semibold tabular-nums text-gray-950">{author.openalex_metrics.h_index}</div>
 									<div class="text-xs text-gray-600">H-Index</div>
 								</div>
 								<div class="text-center">
-									<div class="text-2xl font-bold text-emerald-700">{author.openalex_metrics.i10_index}</div>
+									<div class="text-2xl font-semibold tabular-nums text-gray-950">{author.openalex_metrics.i10_index}</div>
 									<div class="text-xs text-gray-600">I10-Index</div>
 								</div>
 								<div class="text-center">
-									<div class="text-2xl font-bold text-emerald-700">{author.openalex_metrics.publications_count}</div>
+									<div class="text-2xl font-semibold tabular-nums text-gray-950">{author.openalex_metrics.publications_count}</div>
 									<div class="text-xs text-gray-600">{m.author_publications_count()}</div>
 								</div>
 							</div>

@@ -70,12 +70,12 @@
 	<div class="min-h-screen bg-gray-50">
 		<nav class="border-b border-gray-200 bg-white text-gray-700" aria-label={m.nav_main()}>
 			<div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-				<div class="flex h-14 items-center justify-between">
+				<div class="flex h-14 items-center justify-between gap-4">
 					<div class="flex items-center gap-2">
 						<a href="/" class="text-base font-semibold tracking-tight text-gray-950" aria-label={m.nav_home()}>AcademicNetwork</a>
 						<button
 							bind:this={menuBtn}
-							class="rounded p-2 text-gray-600 sm:hidden"
+							class="rounded p-2 text-gray-600 lg:hidden"
 							aria-label={menuOpen ? m.nav_close_menu() : m.nav_open_menu()}
 							aria-expanded={menuOpen}
 							onclick={() => (menuOpen = !menuOpen)}
@@ -85,12 +85,12 @@
 							</svg>
 						</button>
 					</div>
-					<div class="hidden h-full items-center gap-1 sm:flex">
+					<div class="hidden h-full items-center gap-1 lg:flex">
 						<LanguageSelector compact />
 						{#each navItems as item}
 							<a
 								href={item.href}
-							class="flex h-full items-center border-b-2 px-3 text-sm transition-colors {isCurrent(item.href) ? 'border-indigo-600 font-semibold text-indigo-800' : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-950'}"
+							class="flex h-full items-center whitespace-nowrap border-b-2 px-3 text-sm transition-colors {isCurrent(item.href) ? 'border-indigo-600 font-semibold text-indigo-800' : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-950'}"
 								aria-current={isCurrent(item.href) ? 'page' : undefined}
 							>{item.label}</a>
 						{/each}
@@ -99,7 +99,7 @@
 				</div>
 			</div>
 			{#if menuOpen}
-				<div class="space-y-1 border-t border-gray-200 px-4 py-3 sm:hidden" role="menu">
+				<div class="space-y-1 border-t border-gray-200 px-4 py-3 lg:hidden" role="menu">
 					{#each navItems as item}
 						<a
 							href={item.href}
