@@ -474,6 +474,8 @@
 	"validation_coauthor_connection": "Conexión por coautoría",
 	"validation_temporal": "Compatibilidad temporal",
 	"validation_topics_career": "Temas y trayectoria",
+	"validation_ranker_suggestion": "Sugerencia del ranker",
+	"validation_ranker_suggestion_help": "El ranker v4 pone a este candidato primero con un puntaje sobre su umbral del 93% de precisión. Es una sugerencia: confírmala o descártala revisando la evidencia.",
 	"validation_summary_pending": "Resumen temático pendiente.",
 	"validation_related_publications": "Publicaciones relacionadas",
 	"validation_no_comparable": "Sin publicaciones comparables.",

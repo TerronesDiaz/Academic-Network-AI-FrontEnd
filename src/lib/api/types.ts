@@ -528,6 +528,10 @@ export interface ValidationCoauthorEvidence {
 export interface ValidationCandidateEvidence {
 	candidate?: {
 		historical_papers?: Array<{ title: string; doi?: string | null; year?: number | null; publication_year?: number | null; source?: string | null }>;
+		ranker_model?: string;
+		ranker_score?: number;
+		/** Ranker v4: top candidate at or above the 93% threshold; a person still confirms. */
+		ranker_suggestion?: boolean;
 	};
 	profile_summary_es?: string | null;
 	topics?: ValidationTopic[];

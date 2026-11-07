@@ -474,6 +474,8 @@
 	"validation_coauthor_connection": "Co-authorship connection",
 	"validation_temporal": "Temporal compatibility",
 	"validation_topics_career": "Topics and career",
+	"validation_ranker_suggestion": "Ranker suggestion",
+	"validation_ranker_suggestion_help": "Ranker v4 puts this candidate first with a score above its 93% precision threshold. It is a suggestion: confirm or reject it after checking the evidence.",
 	"validation_summary_pending": "Topic summary pending.",
 	"validation_related_publications": "Related publications",
 	"validation_no_comparable": "No comparable publications.",

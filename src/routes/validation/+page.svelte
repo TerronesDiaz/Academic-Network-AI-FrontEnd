@@ -884,6 +884,7 @@
 											<div class="flex flex-wrap items-center gap-2">
 												<h4 class="font-bold text-gray-950">{candidate.canonical_name}</h4>
 										{#if candidate.id === group.proposed_author_id}<span class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">{m.validation_suggested()}</span>{/if}
+										{#if candidate.evidence.candidate?.ranker_suggestion}<span title={m.validation_ranker_suggestion_help()} class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">{m.validation_ranker_suggestion()}</span>{/if}
 											</div>
 											{#if candidate.affiliation}<p class="mt-1 text-sm text-gray-600">{candidate.affiliation}</p>{/if}
 									<div class="mt-2 flex gap-3 text-xs"><a href={`/authors/${candidate.id}`} target="_blank" rel="noreferrer" class="font-semibold text-indigo-700 hover:underline">{m.validation_profile()}</a>{#if candidate.profile_url}<a href={candidate.profile_url} target="_blank" rel="noreferrer" class="text-gray-600 hover:underline">Scholar</a>{/if}</div>
