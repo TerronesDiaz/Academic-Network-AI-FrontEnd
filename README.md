@@ -115,6 +115,34 @@ Este frontend **no** ejecuta Playwright, OpenAlex ni el AND: solo consume REST.
 Backend: [`../AcademicNetworkBackEnd/`](../AcademicNetworkBackEnd/)  
 Arranque conjunto: [`../Context/09-guia-de-arranque.md`](../Context/09-guia-de-arranque.md)
 
+## Ramas experimentales
+
+Estado al 2026-11-10: `main` contiene todo el trabajo vigente. Queda fuera,
+a propósito, una rama experimental, que se conserva en GitHub para reproducir
+el piloto.
+
+**`feature/supervised-ranker-pilot`**: commit `dcacc1c` (2026-10-26), creada
+desde `b816b25`.
+
+- **Qué es:** la pantalla de revisión del piloto supervisado UdeC de 20
+  ocurrencias, en `/validation/gold/supervised`.
+- **Cómo funciona:** habla con una API local aparte del piloto
+  (`127.0.0.1:8793`), con su propio inicio de sesión y token guardado en
+  `sessionStorage`, separado del JWT de producción. Para eso modifica
+  `src/routes/+layout.svelte`: en esa ruta no restaura la sesión de
+  producción ni redirige al login.
+- **Por qué no está en `main`:** fue un piloto exploratorio. Lo reemplazó la
+  sugerencia del ranker v4 en la validación, que ya está en `main`
+  (`f436e1d`). Unirla agregaría al producto una ruta fuera de su
+  autenticación y choca con el `+layout.svelte` actual.
+- **Documentación:**
+  [`docs/design/udec_supervised_pilot.md`](../AcademicNetworkBackEnd/docs/design/udec_supervised_pilot.md)
+  en el backend.
+
+La rama `feature/dashboard-dimensions-redesign` se unió a `main` y se borró
+el mismo día. Las ramas experimentales del backend están descritas en
+[`docs/design/history/experimental_branches.md`](../AcademicNetworkBackEnd/docs/design/history/experimental_branches.md).
+
 ## Scaffold original
 
 El proyecto se generó con [`sv`](https://github.com/sveltejs/cli) (plantilla minimal + TypeScript + Tailwind). La configuración de recreación histórica:
